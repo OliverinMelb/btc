@@ -12,6 +12,10 @@ from .ccxt_vendor import (
     get_ccxt_indicators_window,
 )
 from .config import get_config
+from .crypto_rss_vendor import (
+    get_crypto_rss_global_news,
+    get_crypto_rss_news,
+)
 from .cryptopanic_vendor import (
     get_cryptopanic_global_news,
     get_cryptopanic_news,
@@ -90,6 +94,7 @@ VENDOR_LIST = [
     "fred",
     "polymarket",
     "alpha_vantage",
+    "cryptorss",
     "cryptopanic",
     "feargreed",
     "derivatives",
@@ -127,13 +132,16 @@ VENDOR_METHODS = {
         "yfinance": get_stock_stats_indicators_window,
     },
     # fundamental_data —— BTC agent v0 已禁用（对 crypto 无意义），见 DISABLED_METHODS
-    # news_data —— cryptopanic 为 crypto 默认，yfinance/alpha_vantage 保留供非 crypto fallback
+    # news_data —— cryptorss(免费 RSS)为 crypto 默认；cryptopanic 需付费(免费层 2026-04-01 停),
+    # yfinance/alpha_vantage 保留供非 crypto fallback
     "get_news": {
+        "cryptorss": get_crypto_rss_news,
         "cryptopanic": get_cryptopanic_news,
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
     },
     "get_global_news": {
+        "cryptorss": get_crypto_rss_global_news,
         "cryptopanic": get_cryptopanic_global_news,
         "yfinance": get_global_news_yfinance,
         "alpha_vantage": get_alpha_vantage_global_news,

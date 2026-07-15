@@ -148,7 +148,7 @@ DEFAULT_CONFIG = _apply_env_overrides({
         "core_stock_apis": "ccxt",           # BTC agent v0: crypto 行情走 ccxt
         "technical_indicators": "ccxt",      # BTC agent v0: 指标基于 ccxt OHLCV
         "fundamental_data": "yfinance",      # 已禁用(DISABLED_METHODS)，值保留仅占位
-        "news_data": "cryptopanic",          # BTC agent v1: crypto 新闻走 CryptoPanic(需 CRYPTOPANIC_API_TOKEN)
+        "news_data": "cryptorss",            # BTC agent v1: crypto 新闻走免费 RSS(零 key);cryptopanic 免费层 2026-04-01 已停,改付费
         "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
         "prediction_markets": "polymarket",  # Options: polymarket (keyless)
         "sentiment_index": "feargreed",      # BTC agent v1: Fear & Greed 指数(免 key)
@@ -158,6 +158,9 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "tool_vendors": {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
     },
+    # BTC agent v1 情报层:crypto 新闻 RSS 源(零 key)。None → 用 vendor 内置默认
+    # (Cointelegraph + Decrypt,实测直连可达)。要加源就填 [名称, url] 列表。
+    "crypto_rss_feeds": None,
     # BTC agent v1 情报层:告警阈值 + 推送 sink。
     # intel_thresholds=None 时用 rules.DEFAULT_THRESHOLDS;要改单项就填该项(其余仍用默认)。
     "intel_thresholds": None,

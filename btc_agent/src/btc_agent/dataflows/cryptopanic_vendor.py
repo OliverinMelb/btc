@@ -1,6 +1,10 @@
-"""CryptoPanic 新闻 vendor(BTC agent v1 情报层)。
+"""CryptoPanic 新闻 vendor(BTC agent v1 情报层)——**付费,非默认**。
 
-替代 yfinance 成为 crypto 的新闻数据源。CryptoPanic 聚合各交易所/媒体/推特的
+⚠️ CryptoPanic 的免费 Developer API 已于 2026-04-01 停用,现需付费计划。默认 crypto
+新闻源已改为零 key 的 RSS 聚合(见 ``crypto_rss_vendor``)。本模块保留:有付费 token 时
+把 config ``data_vendors.news_data`` 设回 ``cryptopanic`` 即可启用(投票信号比 RSS 丰富)。
+
+CryptoPanic 聚合各交易所/媒体/推特的
 crypto 头条,按币种(currencies=BTC)过滤,自带看涨/看跌投票信号。与其它 vendor 同构:
 - ``get_cryptopanic_news`` 对应 ``get_news``,按 ticker + 日期窗口返回格式化字符串;
 - ``get_cryptopanic_global_news`` 对应 ``get_global_news``,取全市场 crypto 头条。
