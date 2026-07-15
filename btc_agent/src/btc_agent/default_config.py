@@ -77,11 +77,14 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # the oldest resolved entries are pruned once this limit is exceeded.
     # Pending entries are never pruned. None disables rotation entirely.
     "memory_log_max_entries": None,
-    # LLM settings — BTC agent v0 用 DeepSeek(内置 provider, base_url 自动,
-    # key 走 DEEPSEEK_API_KEY)。deep=旗舰裁决, quick=快模型取数/交易员。
+    # LLM settings — BTC agent v0 用 DeepSeek(内置 provider, key 走 DEEPSEEK_API_KEY)。
+    # deep=旗舰裁决, quick=快模型取数/交易员。
+    # 模型名必须是 backend_url 中转站实际部署的 ID(先打 `/v1/models` 查):link3.top
+    # 把别名 `deepseek-chat` 转发成上游 `DeepSeek-V3.2-Exp`,该站无此部署 → 429。
+    # 用站里真实存在的 `deepseek-v3.2`。换中转站/直连官方 API 时按该端点的清单回改。
     "llm_provider": "deepseek",
-    "deep_think_llm": "deepseek-chat",
-    "quick_think_llm": "deepseek-chat",
+    "deep_think_llm": "deepseek-v3.2",
+    "quick_think_llm": "deepseek-v3.2",
     # When None, each provider's client falls back to its own default endpoint
     # (api.openai.com for OpenAI, generativelanguage.googleapis.com for Gemini, ...).
     # The CLI overrides this per provider when the user picks one. Keeping a

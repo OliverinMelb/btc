@@ -15,6 +15,7 @@ from collections.abc import Iterable
 import pandas as pd
 from stockstats import wrap
 
+from btc_agent.dataflows.config import get_config
 from btc_agent.dataflows.stockstats_utils import load_ohlcv
 
 # A fixed, common indicator set so the snapshot is the same shape every run.
@@ -25,14 +26,34 @@ DEFAULT_SNAPSHOT_INDICATORS: tuple[str, ...] = (
 )
 
 
+def _load_verified_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
+    """Fetch OHLCV through the SAME vendor the rest of the run uses.
+
+    ``load_ohlcv`` is hardwired to yfinance, which resolves a bare crypto
+    ticker like ``BTC`` to an unrelated listed product (the "Grayscale Bitcoin
+    Mini Trust ETF", ~\\$28) instead of BTC spot (~\\$64k). Since this snapshot
+    is the *source of truth* the market analyst is told to trust above all
+    other tools, feeding it ETF prices makes every agent reason about an ETF
+    with a NAV discount. So when the configured ``core_stock_apis`` vendor is
+    ccxt (the crypto path), pull the OHLCV frame from ccxt — the same source
+    the mechanical trade levels already use — keeping the snapshot consistent
+    with the real instrument. Stocks keep the yfinance path unchanged.
+    """
+    vendor = get_config().get("data_vendors", {}).get("core_stock_apis")
+    if vendor == "ccxt":
+        from btc_agent.dataflows.ccxt_vendor import _ohlcv_dataframe
+        return _ohlcv_dataframe(symbol, curr_date=curr_date)
+    return load_ohlcv(symbol, curr_date)
+
+
 def _verified_rows(symbol: str, curr_date: str) -> pd.DataFrame:
     """OHLCV on or before curr_date, date-sorted. Raises if nothing usable.
 
-    ``load_ohlcv`` already normalizes the Date column and filters out
+    The loader already normalizes the Date column and filters out
     look-ahead rows, but we re-apply the cutoff defensively — this is a
     verification path, so it must not trust its input to be pre-filtered.
     """
-    data = load_ohlcv(symbol, curr_date)
+    data = _load_verified_ohlcv(symbol, curr_date)
     if data is None or data.empty:
         raise ValueError(f"No OHLCV data available for {symbol}.")
 

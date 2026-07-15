@@ -17,22 +17,34 @@ def create_bear_researcher(llm):
         fundamentals_report = state["fundamentals_report"]
         instrument_context = get_instrument_context_from_state(state)
         asset_type = state.get("asset_type", "stock")
-        target_label = "stock" if asset_type == "stock" else "asset"
+        is_crypto = asset_type != "stock"
+        target_label = "asset" if is_crypto else "stock"
         fundamentals_label = (
-            "Company fundamentals report"
-            if asset_type == "stock"
-            else "Asset fundamentals report (may be unavailable for crypto)"
+            "Asset fundamentals report (may be unavailable for crypto)"
+            if is_crypto
+            else "Company fundamentals report"
         )
 
-        prompt = f"""You are a Bear Analyst making the case against investing in the {target_label}. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively.
+        if is_crypto:
+            key_points = """Key points to focus on:
 
-Key points to focus on:
+- Risks and Challenges: Highlight factors like weakening demand, leverage flushouts, regulatory crackdowns, or macro/liquidity threats that could hinder the asset's price.
+- Structural Weaknesses: Emphasize vulnerabilities such as thin liquidity, concentrated holdings, security/protocol risk, or competition from rival chains eroding the network's dominance.
+- Negative Indicators: Use evidence from price/technical breakdowns, adverse positioning (crowded funding, rising open interest into resistance, exchange inflows), on-chain metrics, or recent bearish news to support your position.
+- Bull Counterpoints: Critically analyze the bull argument with specific data and sound reasoning, exposing weaknesses or over-optimistic assumptions.
+- Engagement: Present your argument in a conversational style, directly engaging with the bull analyst's points and debating effectively rather than simply listing facts."""
+        else:
+            key_points = """Key points to focus on:
 
 - Risks and Challenges: Highlight factors like market saturation, financial instability, or macroeconomic threats that could hinder the stock's performance.
 - Competitive Weaknesses: Emphasize vulnerabilities such as weaker market positioning, declining innovation, or threats from competitors.
 - Negative Indicators: Use evidence from financial data, market trends, or recent adverse news to support your position.
 - Bull Counterpoints: Critically analyze the bull argument with specific data and sound reasoning, exposing weaknesses or over-optimistic assumptions.
-- Engagement: Present your argument in a conversational style, directly engaging with the bull analyst's points and debating effectively rather than simply listing facts.
+- Engagement: Present your argument in a conversational style, directly engaging with the bull analyst's points and debating effectively rather than simply listing facts."""
+
+        prompt = f"""You are a Bear Analyst making the case against a long position in the {target_label}. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively.
+
+{key_points}
 
 Resources available:
 

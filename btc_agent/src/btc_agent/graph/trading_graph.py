@@ -338,13 +338,19 @@ class TradingAgentsGraph:
     def resolve_instrument_context(self, ticker: str, asset_type: str = "stock") -> str:
         """Resolve ticker identity once and return the full instrument context.
 
-        Deterministic yfinance lookup (cached, fail-open) injected into a
-        context string so every agent anchors to the real company instead of
-        hallucinating one from the price chart (#814). Both the propagate()
-        path and the CLI call this so the resolved identity reaches the whole
-        graph regardless of entry point.
+        For stocks, a deterministic yfinance lookup (cached, fail-open) is
+        injected into a context string so every agent anchors to the real
+        company instead of hallucinating one from the price chart (#814).
+
+        For crypto, the lookup is **skipped**: yfinance resolves bare crypto
+        tickers like ``BTC`` to an unrelated listed product (e.g. the
+        "Grayscale Bitcoin Mini Trust ETF", quote_type ETF, ~\\$28), and
+        injecting that identity does the opposite of #814 — it poisons every
+        downstream agent into treating BTC as an ETF share with a NAV discount.
+        A crypto asset has no company identity to resolve, so we build the
+        context from the ticker alone.
         """
-        identity = resolve_instrument_identity(ticker)
+        identity = None if asset_type == "crypto" else resolve_instrument_identity(ticker)
         return build_instrument_context(ticker, asset_type, identity)
 
     def _run_signature(self, asset_type: str) -> str:
