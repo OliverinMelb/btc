@@ -35,7 +35,11 @@ def create_research_manager(llm):
 - **Underweight**: Cautious view; recommend trimming exposure
 - **Sell**: Strong conviction in the bear thesis; recommend exiting or avoiding the position
 
-Commit to a clear stance whenever the debate's strongest arguments warrant one; reserve Hold for situations where the evidence on both sides is genuinely balanced.
+Blank-slate discipline (白卷文化): BTC is 7×24 and highly volatile. When the environment is
+unclear, the evidence is thin or conflicting, or neither side's argument is decisive, prefer
+Hold (a deliberate no-trade / blank answer) over manufacturing a directional call. A disciplined
+Hold in an unclear regime is the correct answer, not a failure to decide. Only commit to
+Buy/Overweight/Underweight/Sell when the debate's strongest arguments genuinely warrant it.
 
 ---
 
