@@ -1,4 +1,33 @@
-﻿{
-  "tasks": []
+{
+  "tasks": [
+    {
+      "task_id": "20260715-133420-v0-fork-ta",
+      "subtasks": [
+        {
+          "subtask_id": "vendor-core",
+          "branch": "subtask/vendor-core",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-vendor-core",
+          "workflow": "agent-change"
+        },
+        {
+          "subtask_id": "ccxt-vendor",
+          "branch": "subtask/ccxt-vendor",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-ccxt-vendor",
+          "workflow": "agent-change"
+        },
+        {
+          "subtask_id": "calendar-benchmark",
+          "branch": "subtask/calendar-benchmark",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-calendar-benchmark",
+          "workflow": "agent-change"
+        },
+        {
+          "subtask_id": "config-run",
+          "branch": "subtask/config-run",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-config-run",
+          "workflow": "agent-change"
+        }
+      ]
+    }
+  ]
 }
-
