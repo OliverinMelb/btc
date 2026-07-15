@@ -17,10 +17,13 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 from stockstats import wrap
 
+from .config import get_config
 from .symbol_utils import NoMarketDataError
 
 # 默认交易所与计价币。BTC → BTC/USDT。crypto 7×24 连续交易，无休市日。
-DEFAULT_EXCHANGE = "binance"
+# 交易所与代理经 config 覆盖(ccxt_exchange / ccxt_proxy)：本机 binance 主站被地域封锁，
+# 默认改用 binance.us 并走本地 Clash 代理(见 default_config)。
+DEFAULT_EXCHANGE = "binanceus"
 DEFAULT_QUOTE = "USDT"
 
 # 与 yfinance 指标路径一致的受支持指标集（stockstats 列名）。
@@ -53,8 +56,15 @@ def _fetch_ohlcv_raw(pair: str, timeframe: str = "1d", limit: int = 400) -> list
     """拉原始 OHLCV：``[[ms_ts, open, high, low, close, volume], ...]``。
 
     交易所网络调用只发生在这里——测试 monkeypatch 本函数即可离线运行。
+    交易所(``ccxt_exchange``)与代理(``ccxt_proxy``)从 config 读，默认见本模块常量。
     """
-    exchange = getattr(ccxt, DEFAULT_EXCHANGE)({"enableRateLimit": True})
+    cfg = get_config()
+    exchange_id = cfg.get("ccxt_exchange") or DEFAULT_EXCHANGE
+    proxy = cfg.get("ccxt_proxy")
+    exchange = getattr(ccxt, exchange_id)({"enableRateLimit": True})
+    if proxy:
+        # ccxt 统一代理属性，优先于环境变量里的远程 VPN 代理(其对交易所常 RESET)。
+        exchange.httpsProxy = proxy
     return exchange.fetch_ohlcv(pair, timeframe=timeframe, limit=limit)
 
 

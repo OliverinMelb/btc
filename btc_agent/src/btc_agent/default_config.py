@@ -80,14 +80,15 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # LLM settings — BTC agent v0 用 DeepSeek(内置 provider, base_url 自动,
     # key 走 DEEPSEEK_API_KEY)。deep=旗舰裁决, quick=快模型取数/交易员。
     "llm_provider": "deepseek",
-    "deep_think_llm": "deepseek-v4-pro",
-    "quick_think_llm": "deepseek-v4-flash",
+    "deep_think_llm": "deepseek-chat",
+    "quick_think_llm": "deepseek-chat",
     # When None, each provider's client falls back to its own default endpoint
     # (api.openai.com for OpenAI, generativelanguage.googleapis.com for Gemini, ...).
     # The CLI overrides this per provider when the user picks one. Keeping a
     # provider-specific URL here would leak (e.g. OpenAI's /v1 was previously
     # being forwarded to Gemini, producing malformed request URLs).
-    "backend_url": None,
+    # BTC agent v0: 走中转站(OpenAI 兼容),覆盖 deepseek 默认 base_url。
+    "backend_url": "https://link3.top/v1",
     # Provider-specific thinking configuration
     "google_thinking_level": None,      # "high", "minimal", etc.
     "openai_reasoning_effort": None,    # "medium", "high", "low"
@@ -131,6 +132,11 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # The configured value is the exact vendor chain — requests are NOT silently
     # routed to vendors you didn't choose. For ordered fallback, list several,
     # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
+    # ccxt vendor 设置(BTC agent v0)。本机 binance 主站被地域封锁(451)且直连交易所
+    # 普遍不可达，故默认用 binance.us + 本地 Clash 代理(实测 kraken/binance.us 经该代理可达)。
+    # 换机器/网络时按需改这两项。
+    "ccxt_exchange": "binanceus",
+    "ccxt_proxy": "http://127.0.0.1:7890",
     "data_vendors": {
         "core_stock_apis": "ccxt",           # BTC agent v0: crypto 行情走 ccxt
         "technical_indicators": "ccxt",      # BTC agent v0: 指标基于 ccxt OHLCV

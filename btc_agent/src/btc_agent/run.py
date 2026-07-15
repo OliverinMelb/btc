@@ -87,7 +87,9 @@ def run(
 
         graph = TradingAgentsGraph(selected_analysts=["market"], config=cfg)
 
-    final_state = graph.propagate(asset, trade_date, asset_type="crypto")
+    # propagate 返回 (final_state, processed_signal);记忆日志的 pending 记录已在
+    # propagate 内部由 store_decision 写好(rating+reasoning)。
+    final_state, _signal = graph.propagate(asset, trade_date, asset_type="crypto")
     final_trade_decision = final_state["final_trade_decision"]
 
     ohlcv = _ohlcv_dataframe(asset, curr_date=trade_date)

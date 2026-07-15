@@ -21,7 +21,8 @@ class _FakeGraph:
 
     def propagate(self, asset, trade_date, asset_type="crypto"):
         assert asset_type == "crypto"
-        return {"final_trade_decision": self._decision}
+        # 真 propagate 返回 (final_state, processed_signal) 元组
+        return {"final_trade_decision": self._decision}, self._decision
 
 
 @pytest.fixture
