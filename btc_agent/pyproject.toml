@@ -3,11 +3,28 @@ name = "btc-agent"
 version = "0.0.0"
 description = "BTC 情报→决策→(模拟)交易 agent，基于 TradingAgents 架构改装"
 requires-python = ">=3.11"
-# v0 只装轻量开发依赖；TradingAgents 改装模块（langgraph/langchain/ccxt 等）
-# 在 v0 编排落地时再逐步加入本列表，bootstrap 会自动同步安装。
+# ST1(vendor-core): 加入 vendored TradingAgents 骨架(graph/agents/dataflows)
+# 的最小可运行依赖子集。ccxt 暂未被 vendored 代码直接 import（ST2 才接入），
+# 但按子任务 spec 的最小依赖清单预先声明，避免 ST2 再改 pyproject。
 dependencies = [
     "ruff",
     "pytest",
+    "langgraph",
+    "langgraph-checkpoint-sqlite",
+    "langchain-core",
+    "langchain-openai",
+    "pydantic",
+    "pandas",
+    "pytz",
+    "stockstats",
+    "ccxt",
+    # vendored dataflows/agent_utils 直接依赖（interface.py 的 yfinance/alpha_vantage/
+    # fred/polymarket 路由骨架、y_finance.py 的日期计算）
+    "yfinance",
+    "requests",
+    "python-dateutil",
+    "python-dotenv",
+    "typing-extensions",
 ]
 
 [build-system]
