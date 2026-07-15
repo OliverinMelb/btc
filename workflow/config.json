@@ -1,0 +1,74 @@
+﻿{
+    "$comment": "BTC agent 项目的 workflow 配置。引擎(scripts/hooks/skills)随 ai-workflow plugin 发布；项目特定的一切都在此文件。{engine}/ 在 check args 中解析为 plugin scripts 目录。",
+    "project_name": "BTC Agent",
+    "memory": {
+        "pointers": [
+            "调研与设计: BTC-AGENT-FEASIBILITY.md(可行性) / BEACON-FEATURE-REFERENCE.md(A股参照) / BTC-DESIGN-REVIEW.md(设计评估+v0→成熟路线)",
+            "Workflow 协议: workflow/README.md | Lessons: workflow/context/lessons.md",
+            "架构基座: TradingAgents(LangGraph 多 agent 辩论)改装，数据源换 crypto vendor，日历改 7×24 UTC"
+        ],
+        "global_memory_dir": "~/.claude/workflow-memory"
+    },
+    "python": {
+        "venv": "btc_agent/.venv"
+    },
+    "components": {
+        "agent": {
+            "dir": "btc_agent",
+            "type": "python-venv",
+            "probe_imports": [
+                "pytest",
+                "ruff"
+            ]
+        }
+    },
+    "checks": {
+        "agent": [
+            {
+                "name": "ruff",
+                "dir": "btc_agent",
+                "cmd": "python",
+                "args": [
+                    "-m",
+                    "ruff",
+                    "check",
+                    "."
+                ]
+            },
+            {
+                "name": "pytest",
+                "dir": "btc_agent",
+                "cmd": "python",
+                "args": [
+                    "-m",
+                    "pytest"
+                ]
+            }
+        ]
+    },
+    "workflow_classes": {
+        "agent-change": [
+            "agent"
+        ]
+    },
+    "auto_check": {
+        "$comment": "PostToolUse 快速检查: 命中 path_contains + extension 的文件跑 ruff",
+        "path_contains": "btc_agent",
+        "extension": ".py",
+        "cmd": "python",
+        "args": [
+            "-m",
+            "ruff",
+            "check"
+        ]
+    },
+    "contract_touchpoints": {
+        "$comment": "契约面尚未成形(v0 骨架阶段)。当数据源 vendor 接口/agent 输出 schema 稳定后，把 dataflows/interface、agents/schemas 等填进 surface_markers 与 structural_checks。",
+        "surface_markers": [],
+        "structural_checks": []
+    },
+    "env_consistency": {
+        "$comment": "接入交易所/LLM/数据源 key 后，在此断言 .env.example 含 BINANCE_API_KEY / CRYPTOPANIC_KEY / OPENAI_API_KEY 等；v0 暂空。",
+        "rules": []
+    }
+}

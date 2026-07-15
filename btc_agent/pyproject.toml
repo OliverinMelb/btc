@@ -1,0 +1,25 @@
+[project]
+name = "btc-agent"
+version = "0.0.0"
+description = "BTC 情报→决策→(模拟)交易 agent，基于 TradingAgents 架构改装"
+requires-python = ">=3.11"
+# v0 只装轻量开发依赖；TradingAgents 改装模块（langgraph/langchain/ccxt 等）
+# 在 v0 编排落地时再逐步加入本列表，bootstrap 会自动同步安装。
+dependencies = [
+    "ruff",
+    "pytest",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
