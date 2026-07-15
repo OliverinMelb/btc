@@ -135,6 +135,32 @@ def test_feishu_sign_is_deterministic():
     assert sig1 == sig2 and isinstance(sig1, str) and len(sig1) > 0
 
 
+def test_email_sink_no_creds_degrades(monkeypatch):
+    for var in ("SMTP_USER", "SMTP_PASSWORD", "EMAIL_TO"):
+        monkeypatch.delenv(var, raising=False)
+    sinks = push.build_sinks_from_config({"intel_push_sinks": ["stdout", "email"]})
+    names = [getattr(s, "name", "") for s in sinks]
+    assert "stdout" in names
+    assert "email" not in names  # 缺凭据 → 降级跳过
+
+
+def test_email_build_message_subject_and_strip():
+    sink = push.EmailSink(user="a@qq.com", password="code", to="b@qq.com")
+    msg = sink._build_message("*BTC 盘面告警 2026-07-15*\n\n🔴 剧烈波动")
+    assert msg["Subject"] == "BTC 盘面告警 2026-07-15"   # 首行、去 *
+    assert msg["To"] == "b@qq.com"
+    assert msg["From"] == "a@qq.com"                       # 未设 EMAIL_FROM → 回退 user
+    assert "剧烈波动" in msg.get_content()
+
+
+def test_email_sink_sends(monkeypatch):
+    sent = {}
+    sink = push.EmailSink(user="a@qq.com", password="code", to="b@qq.com")
+    monkeypatch.setattr(sink, "_send", lambda m: sent.setdefault("m", m))
+    sink.send("hi")
+    assert sent["m"] == "hi"
+
+
 def test_feishu_payload_strips_markdown_and_checks_code(monkeypatch):
     """验证:去 * 加粗、带 msg_type=text;body code!=0 时抛错。"""
     captured = {}

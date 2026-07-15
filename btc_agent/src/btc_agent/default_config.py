@@ -164,10 +164,11 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # BTC agent v1 情报层:告警阈值 + 推送 sink。
     # intel_thresholds=None 时用 rules.DEFAULT_THRESHOLDS;要改单项就填该项(其余仍用默认)。
     "intel_thresholds": None,
-    # 推送渠道名列表。可选 "stdout" / "feishu" / "telegram"。
+    # 推送渠道名列表。可选 "stdout" / "email" / "feishu" / "telegram"。
+    # email 需 SMTP_USER + SMTP_PASSWORD(QQ 邮箱填授权码) + EMAIL_TO(默认 smtp.qq.com:465);
     # feishu 需 FEISHU_WEBHOOK_URL(+ 可选 FEISHU_WEBHOOK_SECRET);telegram 需
     # TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID。凭据缺失的渠道自动降级跳过(不阻断其它)。
-    "intel_push_sinks": ["stdout", "feishu"],
+    "intel_push_sinks": ["stdout", "email"],
     # Benchmark for alpha calculation in the reflection layer.
     # ``benchmark_ticker`` (when set) overrides the suffix map for all
     # tickers; leave it None to use ``benchmark_map`` for auto-detection

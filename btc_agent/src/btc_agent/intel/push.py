@@ -1,8 +1,9 @@
 """告警推送(BTC agent v1 情报层)。
 
 可插拔 sink:把 ``Alert`` 列表渲染成一条消息发出去。``StdoutSink``(零依赖、本地可见);
-``TelegramSink`` 走 Telegram Bot API;``FeishuSink`` 走飞书自定义机器人 webhook。凭据
-一律从环境变量读,网络出口集中在各自 ``_send`` 单点(测试 monkeypatch 即可离线跑,不真发)。
+``EmailSink`` 走 SMTP(默认 QQ 邮箱);``FeishuSink`` 走飞书自定义机器人 webhook;
+``TelegramSink`` 走 Telegram Bot API。凭据一律从环境变量读,网络出口集中在各自 ``_send``
+单点(测试 monkeypatch 即可离线跑,不真发)。
 
 推送与规则解耦:规则引擎只产出 Alert,本模块只负责"送达",互不知道对方细节。
 """
@@ -134,6 +135,69 @@ class FeishuSink:
         self._send(message)
 
 
+class EmailSink:
+    """通过 SMTP 发邮件推送(默认 QQ 邮箱 smtp.qq.com:465 SSL)。
+
+    凭据从环境变量读:``SMTP_USER``(发件邮箱)、``SMTP_PASSWORD``(**授权码**,非登录密码)、
+    ``EMAIL_TO``(收件人);可选 ``SMTP_HOST``/``SMTP_PORT``/``EMAIL_FROM``。缺必填项则构造
+    时报错(调用方决定是否启用)。用 stdlib ``smtplib``,不加依赖;主题取消息首行。
+    """
+
+    name = "email"
+
+    def __init__(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        to: str | None = None,
+        sender: str | None = None,
+    ):
+        self.host = host or os.getenv("SMTP_HOST", "smtp.qq.com")
+        self.port = int(port or os.getenv("SMTP_PORT", "465"))
+        self.user = user or os.getenv("SMTP_USER")
+        self.password = password or os.getenv("SMTP_PASSWORD")
+        self.to = to or os.getenv("EMAIL_TO")
+        self.sender = sender or os.getenv("EMAIL_FROM") or self.user
+        if not (self.user and self.password and self.to):
+            raise ValueError(
+                "EmailSink 需要 SMTP_USER / SMTP_PASSWORD / EMAIL_TO 环境变量"
+                "(QQ 邮箱 SMTP_PASSWORD 填授权码,非登录密码)。"
+            )
+
+    def _build_message(self, message: str):
+        """把推送文本组装成 EmailMessage:去 * 加粗,主题取首行。"""
+        from email.message import EmailMessage
+
+        text = message.replace("*", "")
+        first_line = next((ln for ln in text.splitlines() if ln.strip()), "BTC 情报")
+        msg = EmailMessage()
+        msg["Subject"] = first_line.strip()
+        msg["From"] = self.sender
+        msg["To"] = self.to
+        msg.set_content(text)
+        return msg
+
+    def _send(self, message: str) -> None:
+        """网络唯一出口(测试 patch 此方法)。465 走 SSL,其它端口走 STARTTLS。"""
+        import smtplib
+
+        msg = self._build_message(message)
+        if self.port == 465:
+            with smtplib.SMTP_SSL(self.host, self.port, timeout=REQUEST_TIMEOUT) as s:
+                s.login(self.user, self.password)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(self.host, self.port, timeout=REQUEST_TIMEOUT) as s:
+                s.starttls()
+                s.login(self.user, self.password)
+                s.send_message(msg)
+
+    def send(self, message: str) -> None:
+        self._send(message)
+
+
 def build_sinks_from_config(config: dict) -> list[Sink]:
     """按 config["intel_push_sinks"](名称列表)构造 sink。
 
@@ -155,6 +219,11 @@ def build_sinks_from_config(config: dict) -> list[Sink]:
                 sinks.append(FeishuSink())
             except ValueError as exc:
                 logger.warning("Feishu sink 未启用:%s", exc)
+        elif name == "email":
+            try:
+                sinks.append(EmailSink())
+            except ValueError as exc:
+                logger.warning("Email sink 未启用:%s", exc)
         else:
             logger.warning("未知推送 sink %r,已跳过。", name)
     return sinks
