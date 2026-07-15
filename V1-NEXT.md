@@ -30,7 +30,23 @@ Grayscale ETF 注入全链);(2) verified snapshot 对 crypto 改走 ccxt(原硬�
 
 </details>
 
-## 之后的 v1（各自单开一个小任务，**尚未开始**）
+## ✅ 之后的 v1 情报层 —— 已完成（2026-07-15）
+- ✅ CryptoPanic 新闻 vendor（`cryptopanic_vendor.py`，和 ccxt 同构，token 走 `CRYPTOPANIC_API_TOKEN`，
+  注册为 `get_news`/`get_global_news` 的 crypto 默认）
+- ✅ F&G 指数 vendor（`feargreed_vendor.py`，alternative.me 免 key）+ 衍生品盘面 vendor
+  （`derivatives_vendor.py`，ccxt 永续资金费率/OI；默认所 okx，binance/bybit 本机被 451/403）
+- ✅ 告警推送管道（`intel/`：`dashboard` 装配 → `rules` 纯规则引擎 → `push` 可插拔 sink
+  stdout/Telegram）。入口 `python -m btc_agent.intel --asset BTC`,真跑三组信号全取到、优雅降级。
+- ✅ 回填 `workflow/config.json` 的 contract_touchpoints + env_consistency（并修了该文件的
+  UTF-8 BOM,使契约漂移检查首次能跑通）
+
+验收:51 离线单测全绿(v1 情报层新增 26)、ruff 全过、契约漂移检查 OK、intel CLI 真数据端到端。
+
+**v1 晋级条件「稳定推送」剩最后一步(需你):** 配 `TELEGRAM_BOT_TOKEN`+`TELEGRAM_CHAT_ID`
+后把 `intel_push_sinks` 加 "telegram",再挂个定时器(Windows 计划任务 / cron)定时跑
+`python -m btc_agent.intel`。新闻 vendor 真跑需 `CRYPTOPANIC_API_TOKEN`(免费注册)。
+
+## 原始 v1 待办（存档）
 - CryptoPanic 新闻 vendor（和 ccxt vendor 同构）
 - F&G 指数 + 盘面指标（资金费率/OI/爆仓）vendor
 - 告警推送管道（规则引擎 → 推送）

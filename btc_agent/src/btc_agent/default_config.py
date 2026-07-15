@@ -140,18 +140,30 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # 换机器/网络时按需改这两项。
     "ccxt_exchange": "binanceus",
     "ccxt_proxy": "http://127.0.0.1:7890",
+    # 永续盘面(资金费率/OI)单独取所:现货默认所 binance.us 无永续合约。
+    # binance/bybit 本机被地域封锁(451/403);实测 okx/gate 经 ccxt_proxy 可达,默认 okx。
+    # 换机器/网络时按需改。
+    "ccxt_derivatives_exchange": "okx",
     "data_vendors": {
         "core_stock_apis": "ccxt",           # BTC agent v0: crypto 行情走 ccxt
         "technical_indicators": "ccxt",      # BTC agent v0: 指标基于 ccxt OHLCV
         "fundamental_data": "yfinance",      # 已禁用(DISABLED_METHODS)，值保留仅占位
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+        "news_data": "cryptopanic",          # BTC agent v1: crypto 新闻走 CryptoPanic(需 CRYPTOPANIC_API_TOKEN)
         "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
         "prediction_markets": "polymarket",  # Options: polymarket (keyless)
+        "sentiment_index": "feargreed",      # BTC agent v1: Fear & Greed 指数(免 key)
+        "derivatives": "derivatives",        # BTC agent v1: 资金费率/OI(ccxt 永续只读)
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
     },
+    # BTC agent v1 情报层:告警阈值 + 推送 sink。
+    # intel_thresholds=None 时用 rules.DEFAULT_THRESHOLDS;要改单项就填该项(其余仍用默认)。
+    "intel_thresholds": None,
+    # 推送渠道名列表。默认只 stdout;要发 Telegram 加 "telegram"(需 TELEGRAM_BOT_TOKEN
+    # + TELEGRAM_CHAT_ID 环境变量,缺则该渠道自动降级跳过)。
+    "intel_push_sinks": ["stdout"],
     # Benchmark for alpha calculation in the reflection layer.
     # ``benchmark_ticker`` (when set) overrides the suffix map for all
     # tickers; leave it None to use ``benchmark_map`` for auto-detection

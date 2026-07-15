@@ -1,4 +1,4 @@
-﻿{
+{
     "$comment": "BTC agent 项目的 workflow 配置。引擎(scripts/hooks/skills)随 ai-workflow plugin 发布；项目特定的一切都在此文件。{engine}/ 在 check args 中解析为 plugin scripts 目录。",
     "project_name": "BTC Agent",
     "memory": {
@@ -63,12 +63,64 @@
         ]
     },
     "contract_touchpoints": {
-        "$comment": "契约面尚未成形(v0 骨架阶段)。当数据源 vendor 接口/agent 输出 schema 稳定后，把 dataflows/interface、agents/schemas 等填进 surface_markers 与 structural_checks。",
-        "surface_markers": [],
-        "structural_checks": []
+        "$comment": "契约面 = vendor 路由 / agent 输出 schema / 机械价位入口 / 情报层规则+推送。改这些文件即视为触碰契约，structural_checks 断言核心不变式不被静默删除(v1 回填)。",
+        "surface_markers": [
+            "btc_agent/src/btc_agent/dataflows/interface.py",
+            "btc_agent/src/btc_agent/agents/schemas.py",
+            "btc_agent/src/btc_agent/run.py",
+            "btc_agent/src/btc_agent/intel/"
+        ],
+        "structural_checks": [
+            {
+                "file": "btc_agent/src/btc_agent/dataflows/interface.py",
+                "must_contain": [
+                    "\"ccxt\": get_ccxt_data",
+                    "\"cryptopanic\": get_cryptopanic_news",
+                    "DISABLED_METHODS = {"
+                ],
+                "error": "vendor 路由契约破损: crypto 行情(ccxt)/新闻(cryptopanic)注册或 fundamentals 禁用被移除"
+            },
+            {
+                "file": "btc_agent/src/btc_agent/agents/schemas.py",
+                "must_contain": [
+                    "class ResearchPlan",
+                    "class TraderProposal",
+                    "class PortfolioDecision"
+                ],
+                "error": "结构化输出 schema 契约破损: 缺 ResearchPlan/TraderProposal/PortfolioDecision"
+            },
+            {
+                "file": "btc_agent/src/btc_agent/run.py",
+                "must_contain": [
+                    "compute_trade_levels",
+                    "mechanical (ATR-based), not LLM"
+                ],
+                "error": "机械价位契约破损: 交易价位必须机械算(不让 LLM 报买卖数字)"
+            },
+            {
+                "file": "btc_agent/src/btc_agent/intel/rules.py",
+                "must_contain": [
+                    "def evaluate"
+                ],
+                "error": "情报层规则引擎契约破损: evaluate 入口缺失"
+            }
+        ]
     },
     "env_consistency": {
-        "$comment": "接入交易所/LLM/数据源 key 后，在此断言 .env.example 含 BINANCE_API_KEY / CRYPTOPANIC_KEY / OPENAI_API_KEY 等；v0 暂空。",
-        "rules": []
+        "$comment": "运行所需 key 从环境变量读(不入库)。断言文档/示例里保留这些变量名，避免接手者漏配。",
+        "rules": [
+            {
+                "$comment": "LLM key(中转站/官方)必须始终从 DEEPSEEK_API_KEY 读，run.py 有显式校验。",
+                "file": "btc_agent/src/btc_agent/run.py",
+                "must_contain": "DEEPSEEK_API_KEY",
+                "error": "run.py 丢失 DEEPSEEK_API_KEY 环境变量校验"
+            },
+            {
+                "$comment": "CryptoPanic 新闻 vendor 的 token 环境变量名保持稳定。",
+                "file": "btc_agent/src/btc_agent/dataflows/cryptopanic_vendor.py",
+                "must_contain": "CRYPTOPANIC_API_TOKEN",
+                "error": "cryptopanic vendor 丢失 CRYPTOPANIC_API_TOKEN 环境变量读取"
+            }
+        ]
     }
 }

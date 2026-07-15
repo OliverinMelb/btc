@@ -12,6 +12,12 @@ from .ccxt_vendor import (
     get_ccxt_indicators_window,
 )
 from .config import get_config
+from .cryptopanic_vendor import (
+    get_cryptopanic_global_news,
+    get_cryptopanic_news,
+)
+from .derivatives_vendor import get_derivatives_snapshot
+from .feargreed_vendor import get_fear_greed
 from .errors import (
     NoMarketDataError,
     VendorNotConfiguredError,
@@ -62,7 +68,20 @@ TOOLS_CATEGORIES = {
         "tools": [
             "get_prediction_markets",
         ]
-    }
+    },
+    # BTC agent v1 情报层:crypto 原生盘面/情绪信号
+    "sentiment_index": {
+        "description": "Crypto market sentiment index (Fear & Greed)",
+        "tools": [
+            "get_fear_greed_index",
+        ]
+    },
+    "derivatives": {
+        "description": "Perpetual-swap derivatives metrics (funding rate, open interest)",
+        "tools": [
+            "get_derivatives",
+        ]
+    },
 }
 
 VENDOR_LIST = [
@@ -71,6 +90,9 @@ VENDOR_LIST = [
     "fred",
     "polymarket",
     "alpha_vantage",
+    "cryptopanic",
+    "feargreed",
+    "derivatives",
 ]
 
 # BTC agent v0：基本面（财报）对 crypto 无意义，整类禁用。调用这些方法会抛出
@@ -88,7 +110,7 @@ DISABLED_METHODS = {
 # sentinel instead of aborting the run (a bad LLM-supplied indicator, a missing
 # key, or a network blip should not crash an analysis over flavour data). Core
 # categories (prices, fundamentals, news) still raise so a broken primary is loud.
-OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
+OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets", "sentiment_index", "derivatives"}
 
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
@@ -105,12 +127,14 @@ VENDOR_METHODS = {
         "yfinance": get_stock_stats_indicators_window,
     },
     # fundamental_data —— BTC agent v0 已禁用（对 crypto 无意义），见 DISABLED_METHODS
-    # news_data
+    # news_data —— cryptopanic 为 crypto 默认，yfinance/alpha_vantage 保留供非 crypto fallback
     "get_news": {
+        "cryptopanic": get_cryptopanic_news,
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
     },
     "get_global_news": {
+        "cryptopanic": get_cryptopanic_global_news,
         "yfinance": get_global_news_yfinance,
         "alpha_vantage": get_alpha_vantage_global_news,
     },
@@ -125,6 +149,14 @@ VENDOR_METHODS = {
     # prediction_markets
     "get_prediction_markets": {
         "polymarket": get_polymarket_prediction_markets,
+    },
+    # sentiment_index —— BTC agent v1 情报层(Fear & Greed,免 key)
+    "get_fear_greed_index": {
+        "feargreed": get_fear_greed,
+    },
+    # derivatives —— BTC agent v1 情报层(资金费率/OI,ccxt 永续只读)
+    "get_derivatives": {
+        "derivatives": get_derivatives_snapshot,
     },
 }
 

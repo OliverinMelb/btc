@@ -1,0 +1,67 @@
+"""情报层运行入口(BTC agent v1)。
+
+``python -m btc_agent.intel --asset BTC --date 2026-07-15``
+
+流程:装配盘面仪表盘 → 机械规则判告警 → 渲染消息 → 推送到配置的 sink。
+纯资讯产品,不做决策、不下单。定时器(cron / 计划任务)重复调用本入口即"稳定推送"。
+"""
+
+from __future__ import annotations
+
+import argparse
+from datetime import datetime, timezone
+
+from btc_agent.dataflows.config import get_config, set_config
+from btc_agent.default_config import DEFAULT_CONFIG
+from btc_agent.intel.dashboard import build_dashboard
+from btc_agent.intel.push import build_sinks_from_config, dispatch, render_message
+from btc_agent.intel.rules import evaluate
+
+
+def run_intel(
+    asset: str = "BTC",
+    curr_date: str | None = None,
+    config: dict | None = None,
+) -> dict:
+    """跑一次情报扫描,返回 ``{dashboard, alerts, message, delivered}``。
+
+    ``config`` 可注入(测试用);为 None 时用 DEFAULT_CONFIG。推送 sink、阈值都从 config 读。
+    """
+    cfg = dict(config or DEFAULT_CONFIG)
+    set_config(cfg)
+    curr_date = curr_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    dashboard = build_dashboard(asset, curr_date)
+    alerts = evaluate(dashboard, get_config().get("intel_thresholds"))
+    message = render_message(asset, curr_date, alerts)
+    sinks = build_sinks_from_config(get_config())
+    delivered = dispatch(message, sinks)
+
+    return {
+        "dashboard": dashboard,
+        "alerts": alerts,
+        "message": message,
+        "delivered": delivered,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="btc_agent.intel",
+        description="BTC agent v1 情报层:盘面仪表盘 → 规则告警 → 推送(不决策/不下单)",
+    )
+    parser.add_argument("--asset", default="BTC", help="资产符号(默认 BTC)")
+    parser.add_argument("--date", default=None, help="UTC 日期 yyyy-mm-dd(默认今日 UTC)")
+    args = parser.parse_args(argv)
+
+    result = run_intel(asset=args.asset, curr_date=args.date)
+    # 消息已由 stdout sink 打印(若启用);这里补一行送达统计到 stderr 友好提示。
+    errors = result["dashboard"].get("errors")
+    if errors:
+        print(f"\n[intel] 部分信号取数失败(已降级): {list(errors.keys())}")
+    print(f"[intel] 触发告警 {len(result['alerts'])} 条,送达 {result['delivered']} 个 sink。")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
