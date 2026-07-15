@@ -148,7 +148,10 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # based on the ticker's exchange suffix. SPY remains the US default
     # so the reflection label keeps reading "Alpha vs SPY" for US tickers
     # while non-US tickers get their regional index automatically.
-    "benchmark_ticker": None,
+    # BTC agent v0: alpha 基准是 BTC 买入持有(BTC-HODL)。benchmark_ticker 指向 BTC 现货
+    # 供结算取价，benchmark_label 是复盘里 "Alpha vs ..." 的人读标签。
+    "benchmark_ticker": "BTC/USDT",
+    "benchmark_label": "BTC-HODL",
     "benchmark_map": {
         ".NS":  "^NSEI",       # NSE India (Nifty 50)
         ".BO":  "^BSESN",      # BSE India (Sensex)

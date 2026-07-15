@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import yfinance as yf
+import pandas as pd
 from langgraph.prebuilt import ToolNode
 
 # Import the abstract tool methods from agent_utils
@@ -250,40 +250,39 @@ class TradingAgentsGraph:
 
     def _fetch_returns(
         self, ticker: str, trade_date: str, holding_days: int = 5,
-        benchmark: str = "SPY",
+        benchmark: str = "BTC/USDT",
     ) -> tuple[float | None, float | None, int | None]:
         """Fetch raw and alpha return for ticker over holding_days from trade_date.
 
-        ``benchmark`` is the index used as the alpha baseline (resolved by the
-        caller via ``_resolve_benchmark``). Returns ``(raw_return, alpha_return,
-        actual_holding_days)`` or ``(None, None, None)`` if price data is
-        unavailable (too recent, delisted, or network error).
+        Crypto is 7×24: the holding window is ``holding_days`` CONTINUOUS UTC days
+        with no weekend/holiday buffer (unlike the equity path this replaces).
+        Prices come from the ccxt vendor, not yfinance. ``benchmark`` is the
+        BTC-HODL baseline symbol (resolved by the caller via ``_resolve_benchmark``).
+        Returns ``(raw_return, alpha_return, actual_holding_days)`` or
+        ``(None, None, None)`` if price data is unavailable (too recent / network).
         """
-        from btc_agent.dataflows.symbol_utils import normalize_symbol
+        from btc_agent.dataflows.ccxt_vendor import _ohlcv_dataframe
+
+        def _close_window(symbol: str) -> list[float]:
+            # Continuous UTC days: fetch up to the settlement date, then keep rows
+            # from trade_date onward. No +7 buffer — crypto trades every day.
+            end = (
+                datetime.strptime(trade_date, "%Y-%m-%d") + timedelta(days=holding_days)
+            ).strftime("%Y-%m-%d")
+            df = _ohlcv_dataframe(symbol, curr_date=end)
+            df = df[df["Date"] >= pd.to_datetime(trade_date)].reset_index(drop=True)
+            return df["Close"].tolist()
 
         try:
-            start = datetime.strptime(trade_date, "%Y-%m-%d")
-            end = start + timedelta(days=holding_days + 7)  # buffer for weekends/holidays
-            end_str = end.strftime("%Y-%m-%d")
-
-            # Normalize so the realized-return lookup hits the same instrument
-            # the analysis priced (e.g. XAUUSD -> GC=F) (#984). The benchmark is
-            # already a canonical Yahoo symbol from ``_resolve_benchmark``.
-            stock = yf.Ticker(normalize_symbol(ticker)).history(start=trade_date, end=end_str)
-            bench = yf.Ticker(benchmark).history(start=trade_date, end=end_str)
+            stock = _close_window(ticker)
+            bench = _close_window(benchmark)
 
             if len(stock) < 2 or len(bench) < 2:
                 return None, None, None
 
             actual_days = min(holding_days, len(stock) - 1, len(bench) - 1)
-            raw = float(
-                (stock["Close"].iloc[actual_days] - stock["Close"].iloc[0])
-                / stock["Close"].iloc[0]
-            )
-            bench_ret = float(
-                (bench["Close"].iloc[actual_days] - bench["Close"].iloc[0])
-                / bench["Close"].iloc[0]
-            )
+            raw = float((stock[actual_days] - stock[0]) / stock[0])
+            bench_ret = float((bench[actual_days] - bench[0]) / bench[0])
             alpha = raw - bench_ret
             return raw, alpha, actual_days
         except Exception as e:
@@ -308,6 +307,9 @@ class TradingAgentsGraph:
             return
 
         benchmark = self._resolve_benchmark(ticker)
+        # Human-facing alpha label (e.g. "BTC-HODL") kept separate from the
+        # fetch symbol (e.g. "BTC/USDT") so the reflection reads cleanly.
+        benchmark_label = self.config.get("benchmark_label") or benchmark
         updates = []
         for entry in pending:
             raw, alpha, days = self._fetch_returns(
@@ -319,7 +321,7 @@ class TradingAgentsGraph:
                 final_decision=entry.get("decision", ""),
                 raw_return=raw,
                 alpha_return=alpha,
-                benchmark_name=benchmark,
+                benchmark_name=benchmark_label,
             )
             updates.append({
                 "ticker": ticker,
