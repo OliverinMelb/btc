@@ -1,15 +1,15 @@
 import logging
 
 from .alpha_vantage import (
-    get_balance_sheet as get_alpha_vantage_balance_sheet,
-    get_cashflow as get_alpha_vantage_cashflow,
-    get_fundamentals as get_alpha_vantage_fundamentals,
     get_global_news as get_alpha_vantage_global_news,
-    get_income_statement as get_alpha_vantage_income_statement,
     get_indicator as get_alpha_vantage_indicator,
     get_insider_transactions as get_alpha_vantage_insider_transactions,
     get_news as get_alpha_vantage_news,
     get_stock as get_alpha_vantage_stock,
+)
+from .ccxt_vendor import (
+    get_ccxt_data,
+    get_ccxt_indicators_window,
 )
 from .config import get_config
 from .errors import (
@@ -20,10 +20,6 @@ from .errors import (
 from .fred import get_macro_data as get_fred_macro_data
 from .polymarket import get_prediction_markets as get_polymarket_prediction_markets
 from .y_finance import (
-    get_balance_sheet as get_yfinance_balance_sheet,
-    get_cashflow as get_yfinance_cashflow,
-    get_fundamentals as get_yfinance_fundamentals,
-    get_income_statement as get_yfinance_income_statement,
     get_insider_transactions as get_yfinance_insider_transactions,
     get_stock_stats_indicators_window,
     get_YFin_data_online,
@@ -46,15 +42,7 @@ TOOLS_CATEGORIES = {
             "get_indicators"
         ]
     },
-    "fundamental_data": {
-        "description": "Company fundamentals",
-        "tools": [
-            "get_fundamentals",
-            "get_balance_sheet",
-            "get_cashflow",
-            "get_income_statement"
-        ]
-    },
+    # fundamental_data 已禁用（BTC agent v0，crypto 无财报），见 DISABLED_METHODS
     "news_data": {
         "description": "News and insider data",
         "tools": [
@@ -78,11 +66,22 @@ TOOLS_CATEGORIES = {
 }
 
 VENDOR_LIST = [
+    "ccxt",
     "yfinance",
     "fred",
     "polymarket",
     "alpha_vantage",
 ]
+
+# BTC agent v0：基本面（财报）对 crypto 无意义，整类禁用。调用这些方法会抛出
+# 显式的 not-applicable 错误，而不是回退到股票数据源。ST4 会同步禁用 fundamentals
+# 分析师，但路由层在此先行封死，任何路径都拿不到股票财报。
+DISABLED_METHODS = {
+    "get_fundamentals",
+    "get_balance_sheet",
+    "get_cashflow",
+    "get_income_statement",
+}
 
 # Optional enrichment categories. These add macro/event context to the news
 # analyst but are not core to a decision, so a vendor failure here degrades to a
@@ -93,33 +92,19 @@ OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
 
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
-    # core_stock_apis
+    # core_stock_apis — ccxt 为 crypto 默认，yfinance/alpha_vantage 保留供非 crypto fallback
     "get_stock_data": {
+        "ccxt": get_ccxt_data,
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
     },
     # technical_indicators
     "get_indicators": {
+        "ccxt": get_ccxt_indicators_window,
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
     },
-    # fundamental_data
-    "get_fundamentals": {
-        "alpha_vantage": get_alpha_vantage_fundamentals,
-        "yfinance": get_yfinance_fundamentals,
-    },
-    "get_balance_sheet": {
-        "alpha_vantage": get_alpha_vantage_balance_sheet,
-        "yfinance": get_yfinance_balance_sheet,
-    },
-    "get_cashflow": {
-        "alpha_vantage": get_alpha_vantage_cashflow,
-        "yfinance": get_yfinance_cashflow,
-    },
-    "get_income_statement": {
-        "alpha_vantage": get_alpha_vantage_income_statement,
-        "yfinance": get_yfinance_income_statement,
-    },
+    # fundamental_data —— BTC agent v0 已禁用（对 crypto 无意义），见 DISABLED_METHODS
     # news_data
     "get_news": {
         "alpha_vantage": get_alpha_vantage_news,
@@ -167,6 +152,11 @@ def get_vendor(category: str, method: str = None) -> str:
 
 def route_to_vendor(method: str, *args, **kwargs):
     """Route method calls to appropriate vendor implementation with fallback support."""
+    if method in DISABLED_METHODS:
+        raise ValueError(
+            f"Method '{method}' is disabled in BTC agent v0: fundamentals/financials "
+            f"are not applicable to crypto assets."
+        )
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
     primary_vendors = [v.strip() for v in vendor_config.split(',')]
