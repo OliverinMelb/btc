@@ -31,8 +31,9 @@ Grayscale ETF 注入全链);(2) verified snapshot 对 crypto 改走 ccxt(原硬�
 </details>
 
 ## ✅ 之后的 v1 情报层 —— 已完成（2026-07-15）
-- ✅ CryptoPanic 新闻 vendor（`cryptopanic_vendor.py`，和 ccxt 同构，token 走 `CRYPTOPANIC_API_TOKEN`，
-  注册为 `get_news`/`get_global_news` 的 crypto 默认）
+- ✅ crypto 新闻 vendor：默认 `crypto_rss_vendor.py`（**零 key** RSS，Cointelegraph+Decrypt，
+  注册为 `get_news`/`get_global_news` 的 crypto 默认）。CryptoPanic 免费层 2026-04-01 已停改付费,
+  `cryptopanic_vendor.py` 保留但非默认(有付费 token 可切回)。
 - ✅ F&G 指数 vendor（`feargreed_vendor.py`，alternative.me 免 key）+ 衍生品盘面 vendor
   （`derivatives_vendor.py`，ccxt 永续资金费率/OI；默认所 okx，binance/bybit 本机被 451/403）
 - ✅ 告警推送管道（`intel/`：`dashboard` 装配 → `rules` 纯规则引擎 → `push` 可插拔 sink
