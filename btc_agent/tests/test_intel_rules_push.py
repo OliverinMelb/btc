@@ -109,3 +109,48 @@ def test_telegram_sink_sends(monkeypatch):
     monkeypatch.setattr(sink, "_send", lambda m: sent.setdefault("m", m))
     sink.send("hi")
     assert sent["m"] == "hi"
+
+
+def test_feishu_sink_no_url_degrades(monkeypatch):
+    monkeypatch.delenv("FEISHU_WEBHOOK_URL", raising=False)
+    sinks = push.build_sinks_from_config({"intel_push_sinks": ["stdout", "feishu"]})
+    names = [getattr(s, "name", "") for s in sinks]
+    assert "stdout" in names
+    assert "feishu" not in names  # 缺 webhook → 降级跳过
+
+
+def test_feishu_sink_sends(monkeypatch):
+    sent = {}
+    sink = push.FeishuSink(webhook_url="https://open.feishu.cn/hook/x")
+    monkeypatch.setattr(sink, "_send", lambda m: sent.setdefault("m", m))
+    sink.send("*BTC 告警*")
+    assert sent["m"] == "*BTC 告警*"
+
+
+def test_feishu_sign_is_deterministic():
+    # 同一 timestamp + secret 应得到稳定 base64 签名(飞书算法)
+    sink = push.FeishuSink(webhook_url="https://x", secret="s3cret")
+    sig1 = sink._sign(1_752_000_000)
+    sig2 = sink._sign(1_752_000_000)
+    assert sig1 == sig2 and isinstance(sig1, str) and len(sig1) > 0
+
+
+def test_feishu_payload_strips_markdown_and_checks_code(monkeypatch):
+    """验证:去 * 加粗、带 msg_type=text;body code!=0 时抛错。"""
+    captured = {}
+
+    class _Resp:
+        def raise_for_status(self): pass
+        def json(self): return {"code": 19021, "msg": "sign match fail"}
+
+    def _fake_post(url, json, timeout):
+        captured["payload"] = json
+        return _Resp()
+
+    monkeypatch.setattr(push.requests, "post", _fake_post)
+    sink = push.FeishuSink(webhook_url="https://x")
+    import pytest
+    with pytest.raises(RuntimeError, match="19021"):
+        sink.send("*hello*")
+    assert captured["payload"]["msg_type"] == "text"
+    assert captured["payload"]["content"]["text"] == "hello"  # * 已去掉

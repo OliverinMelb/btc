@@ -1,8 +1,8 @@
 """告警推送(BTC agent v1 情报层)。
 
-可插拔 sink:把 ``Alert`` 列表渲染成一条消息发出去。默认 ``StdoutSink``(零依赖、
-本地可见);``TelegramSink`` 走 Telegram Bot API,token/chat_id 从环境变量读,网络
-出口集中在 ``_send`` 单点(测试 monkeypatch 即可离线跑,不真发消息)。
+可插拔 sink:把 ``Alert`` 列表渲染成一条消息发出去。``StdoutSink``(零依赖、本地可见);
+``TelegramSink`` 走 Telegram Bot API;``FeishuSink`` 走飞书自定义机器人 webhook。凭据
+一律从环境变量读,网络出口集中在各自 ``_send`` 单点(测试 monkeypatch 即可离线跑,不真发)。
 
 推送与规则解耦:规则引擎只产出 Alert,本模块只负责"送达",互不知道对方细节。
 """
@@ -86,6 +86,54 @@ class TelegramSink:
         self._send(message)
 
 
+class FeishuSink:
+    """通过飞书(Feishu/Lark)自定义机器人 webhook 推送。
+
+    webhook 从 ``FEISHU_WEBHOOK_URL`` 读;缺失则构造时报错(调用方决定是否启用)。
+    若机器人开了"签名校验",把密钥放 ``FEISHU_WEBHOOK_SECRET``,本 sink 自动按飞书算法
+    (``HMAC-SHA256(key=f"{ts}\\n{secret}", msg="")`` → base64)带上 timestamp+sign。
+    飞书 text 消息不渲染 Markdown,故发送前去掉 ``*`` 加粗标记(emoji 正常显示)。
+    """
+
+    name = "feishu"
+
+    def __init__(self, webhook_url: str | None = None, secret: str | None = None):
+        self.webhook_url = webhook_url or os.getenv("FEISHU_WEBHOOK_URL")
+        self.secret = secret or os.getenv("FEISHU_WEBHOOK_SECRET")
+        if not self.webhook_url:
+            raise ValueError("FeishuSink 需要 FEISHU_WEBHOOK_URL 环境变量。")
+
+    def _sign(self, timestamp: int) -> str:
+        """按飞书自定义机器人签名算法算 sign(仅在设置了 secret 时调用)。"""
+        import base64
+        import hashlib
+        import hmac
+
+        string_to_sign = f"{timestamp}\n{self.secret}"
+        digest = hmac.new(string_to_sign.encode("utf-8"), b"", hashlib.sha256).digest()
+        return base64.b64encode(digest).decode("utf-8")
+
+    def _send(self, message: str) -> None:
+        """网络唯一出口(测试 patch 此方法)。timestamp 由调用方注入以便可测。"""
+        import time
+
+        text = message.replace("*", "")  # 飞书 text 不渲染 Markdown 加粗
+        payload: dict = {"msg_type": "text", "content": {"text": text}}
+        if self.secret:
+            ts = int(time.time())
+            payload["timestamp"] = str(ts)
+            payload["sign"] = self._sign(ts)
+        resp = requests.post(self.webhook_url, json=payload, timeout=REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        # 飞书 HTTP 200 但业务失败时 body 里 code!=0(如关键词不匹配/签名错),需显式检查。
+        body = resp.json()
+        if body.get("code") not in (0, None):
+            raise RuntimeError(f"飞书 webhook 返回错误 code={body.get('code')}: {body.get('msg')}")
+
+    def send(self, message: str) -> None:
+        self._send(message)
+
+
 def build_sinks_from_config(config: dict) -> list[Sink]:
     """按 config["intel_push_sinks"](名称列表)构造 sink。
 
@@ -102,6 +150,11 @@ def build_sinks_from_config(config: dict) -> list[Sink]:
                 sinks.append(TelegramSink())
             except ValueError as exc:
                 logger.warning("Telegram sink 未启用:%s", exc)
+        elif name == "feishu":
+            try:
+                sinks.append(FeishuSink())
+            except ValueError as exc:
+                logger.warning("Feishu sink 未启用:%s", exc)
         else:
             logger.warning("未知推送 sink %r,已跳过。", name)
     return sinks
