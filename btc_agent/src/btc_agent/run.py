@@ -18,8 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from btc_agent.agents.utils.rating import extract_rating
-from btc_agent.dataflows.ccxt_vendor import _ohlcv_dataframe
 from btc_agent.default_config import DEFAULT_CONFIG
+from btc_agent.evidence import build_evidence_snapshot
 from btc_agent.trade_levels import compute_trade_levels, rating_to_direction
 
 
@@ -75,10 +75,14 @@ def run(
     trade_date: str | None = None,
     config: dict | None = None,
     graph=None,
+    snapshot=None,
 ) -> dict:
     """跑一次 v0 研判并落一条结构化记录,返回该记录。
 
     ``graph`` 可注入(测试用);为 None 时按 config 构造 market-only crypto 图。
+    ``snapshot`` 可注入一份已冻结的 ``EvidenceSnapshot``(测试用,或与其它路径共用
+    同一份取数结果);为 None 时按 ``asset``/``trade_date`` 自建一份。机械交易价位
+    离不开真实 OHLCV,快照取数失败时原样重新抛出(不像仪表盘那样降级)。
     """
     cfg = dict(config or DEFAULT_CONFIG)
     trade_date = trade_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -94,7 +98,13 @@ def run(
     final_state, _signal = graph.propagate(asset, trade_date, asset_type="crypto")
     final_trade_decision = final_state["final_trade_decision"]
 
-    ohlcv = _ohlcv_dataframe(asset, curr_date=trade_date)
+    if snapshot is None:
+        snapshot = build_evidence_snapshot(asset, trade_date)
+    if snapshot.ohlcv is None:
+        reason = snapshot.health.get("ohlcv", "unknown")
+        raise RuntimeError(f"evidence snapshot has no OHLCV, cannot compute trade levels: {reason}")
+
+    ohlcv = snapshot.ohlcv
     record = build_structured_record(asset, trade_date, final_trade_decision, ohlcv)
     path = write_record(record, cfg["results_dir"])
     record["_record_path"] = str(path)
