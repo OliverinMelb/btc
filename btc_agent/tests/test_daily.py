@@ -318,6 +318,72 @@ class _RangeRegime:
     params_used = {}
 
 
+def test_explicit_candidate_provider_none_skips_even_in_range_environment(monkeypatch):
+    """ST5 reviewer 备注 A: 显式传 candidate_provider=None 时,即便环境允许(range)
+    也恒跳过候选——不构造候选、不调用 default_candidate_provider。"""
+    from btc_agent import candidates as candidates_mod
+
+    def _boom(*a, **k):  # pragma: no cover - 不应被调用
+        raise AssertionError("candidate_provider=None 时不应调用默认候选引擎")
+
+    monkeypatch.setattr(candidates_mod, "default_candidate_provider", _boom)
+    monkeypatch.setattr(daily_mod, "detect_regime", lambda snap: _RangeRegime())
+    monkeypatch.setattr(daily_mod, "build_sinks_from_config", lambda cfg: [_FakeSink("stdout")])
+
+    ohlcv = _touching_range_ohlcv()
+    snapshot = _snapshot(ohlcv=ohlcv, health={"ohlcv": "ok"})
+    fake_graph = _FakeGraph("**Rating**: Hold\n\nRange-bound, mixed signals.")
+
+    result = daily_mod.run_daily(
+        asset="BTC",
+        trade_date="2026-07-16",
+        config={"intel_push_sinks": ["stdout"]},
+        graph=fake_graph,
+        snapshot=snapshot,
+        candidate_provider=None,
+    )
+
+    assert result["candidates"] is None
+    assert "本次操作候选: 无" in result["card"]
+
+
+def test_ledger_recorder_full_pipeline_records_all_tables(tmp_path, monkeypatch):
+    """sqlite-ledger 子任务: daily 全流程(fake 一切)落库——
+    snapshots/candidates/verdicts/trade_levels 各有行,离线零网络。"""
+    from functools import partial
+
+    from btc_agent import ledger as ledger_mod
+    from btc_agent.candidates import default_candidate_provider
+
+    conn = ledger_mod.connect(str(tmp_path / "ledger.sqlite3"))
+
+    def fake_ledger_recorder(snapshot, regime_result, rating, reasoning, levels, candidates):
+        ledger_mod.record_daily(conn, snapshot, regime_result, rating, reasoning, levels, candidates)
+
+    ohlcv = _touching_range_ohlcv()
+    snapshot = _snapshot(ohlcv=ohlcv, health={"ohlcv": "ok"})
+    monkeypatch.setattr(daily_mod, "detect_regime", lambda snap: _RangeRegime())
+    monkeypatch.setattr(daily_mod, "build_sinks_from_config", lambda cfg: [_FakeSink("stdout")])
+    fake_llm = _FakeVerdictLLM("Verdict: accept\nReason: mechanical evidence lines up.")
+    fake_graph = _FakeGraph("**Rating**: Hold\n\nRange-bound, mixed signals.")
+
+    result = daily_mod.run_daily(
+        asset="BTC",
+        trade_date="2026-07-16",
+        config={"intel_push_sinks": ["stdout"]},
+        graph=fake_graph,
+        snapshot=snapshot,
+        candidate_provider=partial(default_candidate_provider, llm=fake_llm),
+        ledger_recorder=fake_ledger_recorder,
+    )
+
+    assert result["candidates"] is not None
+    assert conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM candidates").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM verdicts").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM trade_levels").fetchone()[0] == 1
+
+
 def test_daily_module_source_contains_mechanical_levels_and_blank_sheet_keywords():
     """契约延伸(ST7 会指到这里): daily.py 源码须含 compute_trade_levels 调用与白卷语义关键字。"""
     src = inspect.getsource(daily_mod)
