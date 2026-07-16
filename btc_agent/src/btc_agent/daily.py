@@ -11,9 +11,11 @@ sink 推送。白卷路径(chaos/insufficient_data)**不构造/不调用研判�
 包本身不 import graph;本模块只单向消费 ``intel.push`` 的 sink 协议,不反向被
 ``intel`` 依赖。
 
-扩展点(留给 ST5/ST6 加挂,本子任务恒为 None 即跳过):
-``candidate_provider(snapshot, regime_result) -> Any | None``、
+扩展点:``candidate_provider(snapshot, regime_result) -> Any | None``、
 ``ledger_recorder(snapshot, regime_result, rating, reasoning, levels, candidates) -> None``。
+``candidate_provider`` 未显式注入时默认接线为 ``candidates.default_candidate_provider``
+(ST5:机械候选 + 有候选时的 LLM 裁决);显式传 ``None`` 才跳过。``ledger_recorder``
+默认仍为 ``None``(ST6 加挂点)。
 
 推送失败/未完整送达 → 非零退出码(语义沿用 v1 情报层 ``run_intel``,代码独立实现,
 不改 ``run_intel.py`` 本身)。
@@ -25,6 +27,7 @@ import argparse
 import os
 from datetime import datetime, timezone
 
+from btc_agent.candidates import default_candidate_provider
 from btc_agent.default_config import DEFAULT_CONFIG
 from btc_agent.evidence import build_evidence_snapshot
 from btc_agent.intel.push import build_sinks_from_config, dispatch
@@ -33,6 +36,10 @@ from btc_agent.decision_card import render_decision_card
 from btc_agent.trade_levels import compute_trade_levels, rating_to_direction
 from btc_agent.agents.utils.rating import extract_rating
 
+# 哨兵:区分"调用方未传 candidate_provider"(→ 用默认机械+LLM 候选引擎)与
+# "调用方显式传 None"(→ 跳过候选,ST4 遗留语义保留)。
+_UNSET = object()
+
 
 def run_daily(
     asset: str = "BTC",
@@ -40,7 +47,7 @@ def run_daily(
     config: dict | None = None,
     graph=None,
     snapshot=None,
-    candidate_provider=None,
+    candidate_provider=_UNSET,
     ledger_recorder=None,
 ) -> dict:
     """跑一次每日决策卡编排,返回
@@ -48,9 +55,13 @@ def run_daily(
     delivered, requested_sinks, active_sinks, delivery_complete}``。
 
     ``graph``/``snapshot`` 可注入(测试用,或与其它路径共用同一份快照)。
-    ``candidate_provider``/``ledger_recorder`` 为 None 时本子任务恒跳过
-    (ST5/ST6 加挂点)。
+    ``candidate_provider`` 未传时默认接线为 ``candidates.default_candidate_provider``
+    (ST5);显式传 ``None`` 才跳过候选。``ledger_recorder`` 为 None 时恒跳过
+    (ST6 加挂点)。
     """
+    if candidate_provider is _UNSET:
+        candidate_provider = default_candidate_provider
+
     cfg = dict(config or DEFAULT_CONFIG)
     trade_date = trade_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 

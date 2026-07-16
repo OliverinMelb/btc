@@ -101,6 +101,36 @@ def _levels_lines(levels: dict | None) -> list[str]:
     return lines
 
 
+def _candidate_field(candidates: Any, key: str, default: Any = None) -> Any:
+    """兼容 dict 或带属性对象两种 candidates 载体形态的字段读取。"""
+    if isinstance(candidates, dict):
+        return candidates.get(key, default)
+    return getattr(candidates, key, default)
+
+
+def _candidate_section(candidates: Any) -> str:
+    """候选段渲染(ST5 加挂):非 None 时展示 候选类型/裁决/四个机械字段/有效期/理由。
+
+    候选价位全部来自机械计算,渲染层只做取值,不做任何解析或推断。
+    """
+    if not candidates:
+        return "本次操作候选: 无"
+
+    lines = [
+        "本次操作候选:",
+        f"- 候选类型: {_candidate_field(candidates, 'candidate_type', '(未知)')}",
+        f"- 裁决: {_candidate_field(candidates, 'verdict', '(未裁决)')}",
+        f"- 机械入场参考: {_candidate_field(candidates, 'entry_ref')}",
+        f"- 机械失效位置: {_candidate_field(candidates, 'invalidation')}",
+        f"- 机械目标区域: {_candidate_field(candidates, 'target_zone')}",
+        f"- 候选有效期: {_candidate_field(candidates, 'expires_utc')}",
+    ]
+    reason = _candidate_field(candidates, "reason")
+    if reason:
+        lines.append(f"- 理由: {reason}")
+    return "\n".join(lines)
+
+
 def _subject_line(asset: str, curr_date: str | None, regime_cn: str, blank_sheet: bool) -> str:
     """首行短句,可直接作邮件主题。"""
     date_part = curr_date or "今日"
@@ -151,11 +181,7 @@ def render_decision_card(
             rating_lines.append(f"理由: {reasoning}")
     sections.append(("rating", "\n".join(rating_lines)))
 
-    if candidates:
-        candidate_text = str(candidates)
-    else:
-        candidate_text = "无"
-    sections.append(("candidates", f"本次操作候选: {candidate_text}"))
+    sections.append(("candidates", _candidate_section(candidates)))
 
     advice = _POSITION_ADVICE.get(regime, _POSITION_ADVICE["insufficient_data"])
     sections.append(("advice", advice))

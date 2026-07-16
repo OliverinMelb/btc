@@ -272,6 +272,38 @@ class SentimentReport(BaseModel):
     )
 
 
+# ---------------------------------------------------------------------------
+# Candidate verdict (BTC agent v2 ST5)
+# ---------------------------------------------------------------------------
+
+
+class CandidateVerdict(BaseModel):
+    """LLM verdict on a mechanically-generated swing candidate.
+
+    The mechanical rule engine (``candidates.py``) computes every price level;
+    the LLM's only job here is a qualitative accept/observe/veto call plus a
+    prose reason. This schema intentionally carries **no numeric fields** —
+    blank-slate discipline means insufficient or conflicting evidence should
+    yield ``observe`` or ``veto``, never a manufactured number.
+    """
+
+    verdict: Literal["accept", "observe", "veto"] = Field(
+        description=(
+            "Qualitative verdict on the candidate. 'accept' only when evidence "
+            "clearly supports it; 'observe' when evidence is thin, missing, or "
+            "mixed; 'veto' when evidence clearly contradicts it. Never invent "
+            "conviction to avoid 'observe'."
+        ),
+    )
+    reason: str = Field(
+        description=(
+            "One or two sentences of qualitative reasoning. Must not contain "
+            "any prices, stop levels, targets, percentages, or other numbers — "
+            "all trade numbers are owned by deterministic downstream rules."
+        ),
+    )
+
+
 def render_sentiment_report(report: SentimentReport) -> str:
     """Render a SentimentReport to the markdown shape the rest of the system expects.
 
