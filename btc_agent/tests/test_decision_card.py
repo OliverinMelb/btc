@@ -164,5 +164,63 @@ def test_short_card_is_not_truncated():
     assert "[... 理由/观察段已截断" not in card
 
 
+# ---------------------------------------------------------------------------
+# 候选段渲染 (swing-candidate 子任务, ST5)
+# ---------------------------------------------------------------------------
+
+_CANDIDATE = {
+    "candidate_type": "range_lower_long",
+    "verdict": "accept",
+    "reason": "证据支持这个候选,机械依据充分。",
+    "entry_ref": 92.0,
+    "invalidation": 85.0,
+    "target_zone": (98.0, 105.0),
+    "expires_utc": "2026-07-21T00:00:00Z",
+}
+
+
+def test_candidate_section_renders_verdict_and_four_mechanical_fields():
+    snapshot = _snapshot()
+    regime_result = _regime("range", False)
+    card = render_decision_card(
+        snapshot, regime_result, "Hold", "flat regime", None, candidates=_CANDIDATE
+    )
+
+    assert "候选类型: range_lower_long" in card
+    assert "裁决: accept" in card
+    assert "机械入场参考: 92.0" in card
+    assert "机械失效位置: 85.0" in card
+    assert "机械目标区域: (98.0, 105.0)" in card
+    assert "候选有效期: 2026-07-21T00:00:00Z" in card
+    assert "证据支持这个候选" in card
+
+
+def test_candidate_section_shows_none_when_no_candidate():
+    snapshot = _snapshot()
+    regime_result = _regime("range", False)
+    card = render_decision_card(snapshot, regime_result, "Hold", "flat regime", None)
+    assert "本次操作候选: 无" in card
+
+
+def test_long_candidate_reason_truncation_regression():
+    """ST4 遗留回归项:候选段超长文本仍要走完整截断级联,卡片不超限、首行主题保留。
+
+    此前截断单测只覆盖过 candidates="无"的短路径;这里让候选的 reason 字段本身
+    超过 4096 上限,断言截断级联(含极端硬截断分支)在候选段也不会崩或越界。
+    """
+    snapshot = _snapshot()
+    regime_result = _regime("range", False)
+    huge_candidate = dict(_CANDIDATE)
+    huge_candidate["reason"] = "候选定性理由超长文本。" * 3000  # 远超 4096
+
+    card = render_decision_card(
+        snapshot, regime_result, "Hold", "short reason", _LEVELS, candidates=huge_candidate
+    )
+
+    assert len(card) <= MAX_MESSAGE_LENGTH
+    first_line = card.splitlines()[0]
+    assert "BTC" in first_line
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-q"])

@@ -234,6 +234,90 @@ def test_cli_exits_nonzero_without_api_key(monkeypatch):
     assert exc_info.value.code == 2
 
 
+class _FakeVerdictLLM:
+    """swing-candidate 子任务: fake llm, 供 daily 全流程注入式测试用(零网络)。"""
+
+    def __init__(self, content: str):
+        self._content = content
+        self.calls = 0
+
+    def invoke(self, prompt):
+        self.calls += 1
+        return type("_R", (), {"content": self._content})()
+
+
+def _touching_range_ohlcv(n: int = 40) -> pd.DataFrame:
+    import math
+
+    dates = pd.date_range("2026-01-01", periods=n, freq="D")
+    rows = []
+    for i in range(n):
+        close = 92.0 if i == n - 1 else 100 + 2 * math.sin(2 * math.pi * i / 10)
+        rows.append(
+            {
+                "Date": dates[i],
+                "Open": close,
+                "High": close + 0.5,
+                "Low": close - 0.5,
+                "Close": close,
+                "Volume": 10.0,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def test_range_environment_produces_candidate_card(monkeypatch):
+    """swing-candidate 子任务: range 环境 → 默认 candidate_provider 出候选卡(fake llm,零网络)。"""
+    from btc_agent.candidates import default_candidate_provider
+    from functools import partial
+
+    ohlcv = _touching_range_ohlcv()
+    snapshot = _snapshot(ohlcv=ohlcv, health={"ohlcv": "ok"})
+    monkeypatch.setattr(daily_mod, "detect_regime", lambda snap: _RangeRegime())
+    monkeypatch.setattr(daily_mod, "build_sinks_from_config", lambda cfg: [_FakeSink("stdout")])
+    fake_llm = _FakeVerdictLLM("Verdict: accept\nReason: mechanical evidence lines up.")
+    fake_graph = _FakeGraph("**Rating**: Hold\n\nRange-bound, mixed signals.")
+
+    result = daily_mod.run_daily(
+        asset="BTC",
+        trade_date="2026-07-16",
+        config={"intel_push_sinks": ["stdout"]},
+        graph=fake_graph,
+        snapshot=snapshot,
+        candidate_provider=partial(default_candidate_provider, llm=fake_llm),
+    )
+
+    assert result["candidates"] is not None
+    assert result["candidates"]["verdict"] == "accept"
+    assert "本次操作候选:" in result["card"]
+    assert "候选类型: range_lower_long" in result["card"]
+    assert fake_llm.calls == 1
+
+
+def test_blank_sheet_path_never_produces_candidates(monkeypatch):
+    """swing-candidate 子任务: 白卷路径 candidate_provider 恒不产候选(regime != range)。"""
+    snapshot = _snapshot(ohlcv=None, health={"ohlcv": "error:timeout"})
+    monkeypatch.setattr(daily_mod, "build_sinks_from_config", lambda cfg: [_FakeSink("stdout")])
+
+    result = daily_mod.run_daily(
+        asset="BTC",
+        trade_date="2026-07-16",
+        config={"intel_push_sinks": ["stdout"]},
+        graph=_RejectingGraph(),
+        snapshot=snapshot,
+    )
+
+    assert result["candidates"] is None
+    assert "本次操作候选: 无" in result["card"]
+
+
+class _RangeRegime:
+    regime = "range"
+    blank_sheet = False
+    observations = {"last_close": 92.0, "sma": 100.0, "sma_slope": 0.0}
+    params_used = {}
+
+
 def test_daily_module_source_contains_mechanical_levels_and_blank_sheet_keywords():
     """契约延伸(ST7 会指到这里): daily.py 源码须含 compute_trade_levels 调用与白卷语义关键字。"""
     src = inspect.getsource(daily_mod)
