@@ -4,6 +4,8 @@
 覆盖:格式化输出、结构化数据、缺 key 抛 NotConfigured、route_to_vendor 路由。
 """
 
+from datetime import datetime, timezone
+
 import pytest
 
 from btc_agent.dataflows import (
@@ -87,6 +89,24 @@ def test_fear_greed_text(monkeypatch):
     assert "Extreme Fear" in out
 
 
+def test_fear_greed_historical_query_never_falls_back_to_future(monkeypatch):
+    """只有 cutoff 之后的数据时应白卷，而不是伪装成历史值。"""
+    future = datetime(2026, 7, 16, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        feargreed_vendor,
+        "_request",
+        lambda limit: {
+            "data": [{
+                "value": "88",
+                "value_classification": "Extreme Greed",
+                "timestamp": str(int(future.timestamp())),
+            }]
+        },
+    )
+    with pytest.raises(ValueError, match="no data on/before"):
+        feargreed_vendor.get_fear_greed_value("2020-01-01")
+
+
 # ---------------- Derivatives ----------------
 
 def test_perp_symbol():
@@ -114,6 +134,11 @@ def test_derivatives_oi_failure_degrades(monkeypatch):
     snap = derivatives_vendor.get_derivatives_snapshot_data("BTC")
     assert snap["funding_rate"] == pytest.approx(-0.0003)
     assert snap["open_interest"] is None
+
+
+def test_derivatives_historical_snapshot_refuses_current_fallback():
+    with pytest.raises(Exception, match="historical funding/OI snapshot is unavailable"):
+        derivatives_vendor.get_derivatives_snapshot_data("BTC", "2020-01-01")
 
 
 def test_new_categories_registered():

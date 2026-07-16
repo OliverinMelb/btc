@@ -49,6 +49,7 @@ def test_run_writes_structured_record(patched_ohlcv, tmp_path):
     assert rec["trade_date"] == "2020-10-01"
     assert rec["generated_at_utc"].endswith("Z")
     assert rec["rating"] == "Buy"
+    assert rec["rating_source"] == "explicit"
     assert rec["direction"] == "long"
     assert "reasoning" in rec
     assert rec["levels"]["entry"] is not None
@@ -81,3 +82,16 @@ def test_hold_rating_yields_flat_levels(patched_ohlcv, tmp_path):
     )
     assert rec["direction"] == "flat"
     assert rec["levels"]["stop"] is None and rec["levels"]["target"] is None
+
+
+def test_unparseable_rating_fails_closed_and_is_auditable(patched_ohlcv, tmp_path):
+    cfg = {"results_dir": str(tmp_path)}
+    rec = run_mod.run(
+        asset="BTC",
+        trade_date="2020-10-01",
+        config=cfg,
+        graph=_FakeGraph("Not Buy; prefer Sell due to conflicting evidence."),
+    )
+    assert rec["rating"] == "Hold"
+    assert rec["direction"] == "flat"
+    assert rec["rating_source"] == "fallback_hold_unparseable"

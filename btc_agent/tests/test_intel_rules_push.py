@@ -69,6 +69,13 @@ def test_render_message_no_alerts():
     assert "无触发规则的异常信号" in msg
 
 
+def test_render_message_data_failure_is_not_healthy():
+    msg = push.render_message("BTC", "2026-07-15", [], {"price": "timeout"})
+    assert "取数失败: price" in msg
+    assert "不能判定盘面正常" in msg
+    assert "无触发规则的异常信号" not in msg
+
+
 def test_render_message_with_alerts():
     msg = push.render_message("BTC", "2026-07-15", [
         Alert("critical", "x", "剧烈波动"),
@@ -101,6 +108,11 @@ def test_telegram_sink_no_env_degrades(monkeypatch):
     names = [getattr(s, "name", "") for s in sinks]
     assert "stdout" in names
     assert "telegram" not in names  # 缺 env → 降级跳过
+
+
+def test_duplicate_sink_names_are_deduplicated():
+    sinks = push.build_sinks_from_config({"intel_push_sinks": ["stdout", "stdout"]})
+    assert [sink.name for sink in sinks] == ["stdout"]
 
 
 def test_telegram_sink_sends(monkeypatch):

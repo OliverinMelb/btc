@@ -27,12 +27,13 @@ def test_run_intel_end_to_end(monkeypatch, capsys):
     assert "fng_extreme_fear" in codes       # warning
     assert "rsi_oversold" in codes           # info
     assert result["delivered"] == 1          # stdout sink
+    assert result["delivery_complete"] is True
     # 消息经 stdout sink 打印
     assert "BTC 盘面告警" in capsys.readouterr().out
 
 
 def test_run_intel_degrades_on_vendor_failure(monkeypatch):
-    """所有信号取数失败时,dashboard 全 None、无告警、消息为"无异常",不崩。"""
+    """所有信号取数失败时必须交白卷，不能把未知推送成"无异常"。"""
     monkeypatch.setattr(dash_mod, "get_fear_greed_value", None, raising=False)
 
     def _empty_dashboard(asset, curr_date):
@@ -47,4 +48,47 @@ def test_run_intel_degrades_on_vendor_failure(monkeypatch):
     result = run_intel.run_intel(asset="BTC", curr_date="2026-07-15",
                                  config={"intel_push_sinks": ["stdout"]})
     assert result["alerts"] == []
-    assert "无触发规则的异常信号" in result["message"]
+    assert "不能判定盘面正常" in result["message"]
+    assert "无触发规则的异常信号" not in result["message"]
+    assert "fear_greed" in result["message"]
+
+
+def test_missing_configured_sink_marks_delivery_incomplete(monkeypatch):
+    for var in ("SMTP_USER", "SMTP_PASSWORD", "EMAIL_TO"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(
+        run_intel,
+        "build_dashboard",
+        lambda asset, curr_date: {
+            "asset": asset,
+            "curr_date": curr_date,
+            "fear_greed": None,
+            "derivatives": None,
+            "rsi": None,
+            "price_move_pct": None,
+            "close": None,
+            "errors": {"price": "offline"},
+        },
+    )
+    result = run_intel.run_intel(
+        config={"intel_push_sinks": ["stdout", "email"]}, curr_date="2026-07-15"
+    )
+    assert result["delivered"] == 1
+    assert result["active_sinks"] == ["stdout"]
+    assert result["delivery_complete"] is False
+
+
+def test_cli_returns_nonzero_when_delivery_is_incomplete(monkeypatch):
+    monkeypatch.setattr(
+        run_intel,
+        "run_intel",
+        lambda **kwargs: {
+            "dashboard": {"errors": {}},
+            "alerts": [],
+            "delivered": 1,
+            "requested_sinks": ["stdout", "email"],
+            "active_sinks": ["stdout"],
+            "delivery_complete": False,
+        },
+    )
+    assert run_intel.main([]) == 1

@@ -17,7 +17,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from btc_agent.agents.utils.rating import parse_rating
+from btc_agent.agents.utils.rating import extract_rating
 from btc_agent.dataflows.ccxt_vendor import _ohlcv_dataframe
 from btc_agent.default_config import DEFAULT_CONFIG
 from btc_agent.trade_levels import compute_trade_levels, rating_to_direction
@@ -35,7 +35,8 @@ def build_structured_record(
     评级由 `parse_rating` 从决策文本抽取;方向性交易价位由 `compute_trade_levels`
     **纯机械**算出——与决策文本的具体措辞无关(只有 rating 决定 long/short/flat)。
     """
-    rating = parse_rating(final_trade_decision)
+    extracted_rating = extract_rating(final_trade_decision)
+    rating = extracted_rating or "Hold"
     direction = rating_to_direction(rating)
     levels = compute_trade_levels(ohlcv, direction)
     return {
@@ -44,6 +45,7 @@ def build_structured_record(
         "generated_at_utc": generated_at
         or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "rating": rating,
+        "rating_source": "explicit" if extracted_rating else "fallback_hold_unparseable",
         "direction": direction,
         "reasoning": final_trade_decision,
         "levels": {

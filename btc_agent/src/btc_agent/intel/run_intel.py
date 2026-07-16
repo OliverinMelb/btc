@@ -33,15 +33,21 @@ def run_intel(
 
     dashboard = build_dashboard(asset, curr_date)
     alerts = evaluate(dashboard, get_config().get("intel_thresholds"))
-    message = render_message(asset, curr_date, alerts)
+    message = render_message(asset, curr_date, alerts, dashboard.get("errors"))
     sinks = build_sinks_from_config(get_config())
     delivered = dispatch(message, sinks)
+    requested_sinks = list(dict.fromkeys(get_config().get("intel_push_sinks") or ["stdout"]))
+    active_sinks = [getattr(sink, "name", type(sink).__name__) for sink in sinks]
+    delivery_complete = delivered == len(requested_sinks)
 
     return {
         "dashboard": dashboard,
         "alerts": alerts,
         "message": message,
         "delivered": delivered,
+        "requested_sinks": requested_sinks,
+        "active_sinks": active_sinks,
+        "delivery_complete": delivery_complete,
     }
 
 
@@ -60,7 +66,13 @@ def main(argv: list[str] | None = None) -> int:
     if errors:
         print(f"\n[intel] 部分信号取数失败(已降级): {list(errors.keys())}")
     print(f"[intel] 触发告警 {len(result['alerts'])} 条,送达 {result['delivered']} 个 sink。")
-    return 0
+    if not result["delivery_complete"]:
+        print(
+            f"[intel] 推送未完整送达: requested={result['requested_sinks']}, "
+            f"active={result['active_sinks']}"
+        )
+    # 无任何 sink 成功时让计划任务看到失败，而不是静默返回 0。
+    return 0 if result["delivery_complete"] else 1
 
 
 if __name__ == "__main__":

@@ -27,14 +27,31 @@ REQUEST_TIMEOUT = 15
 _LEVEL_ICON = {"critical": "🔴", "warning": "🟠", "info": "🔵"}
 
 
-def render_message(asset: str, curr_date: str, alerts: list[Alert]) -> str:
-    """把告警列表渲染成一条 Markdown 消息。无告警时给出明确"无异常"文案。"""
-    if not alerts:
+def render_message(
+    asset: str,
+    curr_date: str,
+    alerts: list[Alert],
+    data_errors: dict | None = None,
+) -> str:
+    """渲染告警，并把取数失败显式带给所有推送渠道。
+
+    无告警但有取数错误时绝不能声称"无异常"：缺数据只能交白卷，不能把未知
+    伪装成健康。
+    """
+    data_errors = data_errors or {}
+    if not alerts and not data_errors:
         return f"*{asset} 盘面告警 {curr_date}*\n\n✅ 无触发规则的异常信号。"
     lines = [f"*{asset} 盘面告警 {curr_date}*", ""]
     for a in alerts:
         icon = _LEVEL_ICON.get(a.level, "•")
         lines.append(f"{icon} [{a.level.upper()}] {a.message}")
+    if data_errors:
+        if alerts:
+            lines.append("")
+        failed = ", ".join(sorted(data_errors))
+        lines.append(f"⚠️ [DATA] 取数失败: {failed}")
+        if not alerts:
+            lines.append("当前数据不完整，不能判定盘面正常；本次按白卷处理。")
     return "\n".join(lines)
 
 
@@ -204,7 +221,7 @@ def build_sinks_from_config(config: dict) -> list[Sink]:
     telegram sink 缺环境变量时降级(记 warning、跳过),不阻断其它 sink——
     情报推送不该因一个渠道未配好而整体失败。未配置时默认只有 stdout。
     """
-    names = config.get("intel_push_sinks") or ["stdout"]
+    names = list(dict.fromkeys(config.get("intel_push_sinks") or ["stdout"]))
     sinks: list[Sink] = []
     for name in names:
         if name == "stdout":

@@ -66,6 +66,44 @@ def test_fetch_returns_uses_ccxt_not_yfinance(patched_ohlcv, tmp_path):
     assert abs(alpha) < 1e-9
 
 
+@pytest.mark.parametrize(
+    ("rating", "strategy_sign"),
+    [("Buy", 1), ("Sell", -1), ("Hold", 0)],
+)
+def test_fetch_returns_applies_decision_direction(
+    patched_ohlcv, tmp_path, rating, strategy_sign
+):
+    graph = TradingAgentsGraph.__new__(TradingAgentsGraph)
+    graph.config = dict(DEFAULT_CONFIG)
+    strategy_return, alpha, days = graph._fetch_returns(
+        "BTC", "2021-01-05", holding_days=5, benchmark="BTC/USDT", rating=rating
+    )
+    market_return = (1.01 ** 5) - 1
+    assert strategy_return == pytest.approx(strategy_sign * market_return)
+    assert alpha == pytest.approx(strategy_return - market_return)
+    assert days == 5
+
+
+def test_return_window_starts_at_same_close_as_mechanical_entry(patched_ohlcv):
+    graph = TradingAgentsGraph.__new__(TradingAgentsGraph)
+    graph.config = dict(DEFAULT_CONFIG)
+    strategy_return, _, _ = graph._fetch_returns(
+        "BTC", "2021-01-05", holding_days=1, benchmark="BTC/USDT", rating="Buy"
+    )
+    # Entry at start of Jan 5 equals Jan 4 completed close; one day later uses Jan 5 close.
+    assert strategy_return == pytest.approx(0.01)
+
+
+def test_fetch_returns_waits_for_full_holding_window(monkeypatch):
+    candles = _daily_candles(days=3)
+    monkeypatch.setattr(ccxt_vendor, "_fetch_ohlcv_raw", lambda *a, **k: candles)
+    graph = TradingAgentsGraph.__new__(TradingAgentsGraph)
+    graph.config = dict(DEFAULT_CONFIG)
+    assert graph._fetch_returns(
+        "BTC", "2021-01-01", holding_days=5, benchmark="BTC/USDT", rating="Buy"
+    ) == (None, None, None)
+
+
 def test_settlement_window_is_continuous_no_weekend_skip(patched_ohlcv, tmp_path):
     """含周六的窗口：holding_days=5 覆盖连续 5 天，不因'非交易日'缩短。
 

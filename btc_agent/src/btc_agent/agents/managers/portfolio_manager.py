@@ -52,6 +52,11 @@ def create_portfolio_manager(llm):
 - **Underweight**: Reduce exposure, take partial profits
 - **Sell**: Exit position or avoid entry
 
+Blank-slate discipline (白卷文化): when evidence is missing, stale, thin, or conflicting,
+choose Hold rather than manufacturing conviction. Output only the rating and qualitative
+reasoning. Never provide entry/exit prices, stop-loss, targets, percentages, position sizing,
+or numeric holding periods; deterministic downstream rules own all trade numbers.
+
 **Context:**
 - Research Manager's investment plan: **{research_plan}**
 - Trader's transaction proposal: **{trader_plan}**
@@ -61,7 +66,7 @@ def create_portfolio_manager(llm):
 
 ---
 
-Be decisive and ground every conclusion in specific evidence from the analysts.{get_language_instruction()}"""
+Be evidence-led and ground every conclusion in specific analyst evidence.{get_language_instruction()}"""
 
         final_trade_decision = invoke_structured_or_freetext(
             structured_llm,

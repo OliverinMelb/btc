@@ -57,7 +57,7 @@ def build_dashboard(asset: str = "BTC", curr_date: str | None = None) -> dict:
     # 衍生品盘面(资金费率/OI)
     try:
         from btc_agent.dataflows.derivatives_vendor import get_derivatives_snapshot_data
-        dashboard["derivatives"] = get_derivatives_snapshot_data(asset)
+        dashboard["derivatives"] = get_derivatives_snapshot_data(asset, curr_date)
     except Exception as exc:  # noqa: BLE001
         dashboard["errors"]["derivatives"] = str(exc)
         logger.warning("衍生品盘面取数失败:%s", exc)

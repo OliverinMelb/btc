@@ -13,6 +13,8 @@ crypto 原生盘面指标——现货没有的、能反映杠杆多空拥挤度�
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import ccxt
 
 from .config import get_config
@@ -52,11 +54,21 @@ def _fetch_open_interest_raw(pair: str) -> dict:
     return _derivatives_exchange().fetch_open_interest(pair)
 
 
-def get_derivatives_snapshot_data(symbol: str) -> dict:
+def get_derivatives_snapshot_data(symbol: str, curr_date: str | None = None) -> dict:
     """返回结构化盘面快照:``{"funding_rate": float, "open_interest": float|None, "symbol": str}``。
 
     纯数据形态,供仪表盘/规则引擎消费。任一子项取数失败不整体崩:缺失记为 None。
     """
+    if curr_date is not None:
+        requested = datetime.strptime(curr_date, "%Y-%m-%d").date()
+        today = datetime.now(timezone.utc).date()
+        if requested != today:
+            raise NoMarketDataError(
+                symbol,
+                _perp_symbol(symbol),
+                "historical funding/OI snapshot is unavailable; refusing current-data fallback",
+            )
+
     pair = _perp_symbol(symbol)
     funding = _fetch_funding_raw(pair)
     rate = funding.get("fundingRate") if isinstance(funding, dict) else None
@@ -80,7 +92,7 @@ def get_derivatives_snapshot_data(symbol: str) -> dict:
 
 def get_derivatives_snapshot(symbol: str, curr_date: str | None = None) -> str:
     """盘面快照的格式化文本(供 LLM/报告消费)。``curr_date`` 仅用于表头,盘面数据取当下。"""
-    snap = get_derivatives_snapshot_data(symbol)
+    snap = get_derivatives_snapshot_data(symbol, curr_date)
     rate_pct = snap["funding_rate"] * 100
     bias = "偏多(多头付费,警惕拥挤)" if snap["funding_rate"] > 0 else "偏空(空头付费)"
     oi = snap["open_interest"]

@@ -251,8 +251,9 @@ class TradingAgentsGraph:
     def _fetch_returns(
         self, ticker: str, trade_date: str, holding_days: int = 5,
         benchmark: str = "BTC/USDT",
+        rating: str = "Buy",
     ) -> tuple[float | None, float | None, int | None]:
-        """Fetch raw and alpha return for ticker over holding_days from trade_date.
+        """Fetch direction-adjusted strategy return and alpha over ``holding_days``.
 
         Crypto is 7×24: the holding window is ``holding_days`` CONTINUOUS UTC days
         with no weekend/holiday buffer (unlike the equity path this replaces).
@@ -264,27 +265,40 @@ class TradingAgentsGraph:
         from btc_agent.dataflows.ccxt_vendor import _ohlcv_dataframe
 
         def _close_window(symbol: str) -> list[float]:
-            # Continuous UTC days: fetch up to the settlement date, then keep rows
-            # from trade_date onward. No +7 buffer — crypto trades every day.
+            # Signal time is the start of trade_date UTC. Its mechanical entry is
+            # therefore the previous completed daily close. After N continuous
+            # days, the exit is the last close strictly before trade_date + N.
             end = (
                 datetime.strptime(trade_date, "%Y-%m-%d") + timedelta(days=holding_days)
             ).strftime("%Y-%m-%d")
+            entry_bar_date = datetime.strptime(trade_date, "%Y-%m-%d") - timedelta(days=1)
             df = _ohlcv_dataframe(symbol, curr_date=end)
-            df = df[df["Date"] >= pd.to_datetime(trade_date)].reset_index(drop=True)
+            df = df[df["Date"] >= pd.to_datetime(entry_bar_date)].reset_index(drop=True)
             return df["Close"].tolist()
 
         try:
             stock = _close_window(ticker)
             bench = _close_window(benchmark)
 
-            if len(stock) < 2 or len(bench) < 2:
+            # Never settle a five-day decision after only one or two elapsed days.
+            required = holding_days + 1
+            if len(stock) < required or len(bench) < required:
                 return None, None, None
 
-            actual_days = min(holding_days, len(stock) - 1, len(bench) - 1)
-            raw = float((stock[actual_days] - stock[0]) / stock[0])
-            bench_ret = float((bench[actual_days] - bench[0]) / bench[0])
-            alpha = raw - bench_ret
-            return raw, alpha, actual_days
+            market_return = float((stock[holding_days] - stock[0]) / stock[0])
+            bench_ret = float((bench[holding_days] - bench[0]) / bench[0])
+
+            from btc_agent.trade_levels import rating_to_direction
+
+            direction = rating_to_direction(rating)
+            if direction == "long":
+                strategy_return = market_return
+            elif direction == "short":
+                strategy_return = -market_return
+            else:
+                strategy_return = 0.0
+            alpha = strategy_return - bench_ret
+            return strategy_return, alpha, holding_days
         except Exception as e:
             logger.warning(
                 "Could not resolve outcome for %s on %s vs %s (will retry next run): %s",
@@ -313,7 +327,7 @@ class TradingAgentsGraph:
         updates = []
         for entry in pending:
             raw, alpha, days = self._fetch_returns(
-                ticker, entry["date"], benchmark=benchmark,
+                ticker, entry["date"], benchmark=benchmark, rating=entry["rating"],
             )
             if raw is None:
                 continue  # price not available yet — try again next run

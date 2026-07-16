@@ -9,7 +9,7 @@
 交易所网络调用集中在 ``_fetch_ohlcv_raw``，测试可 monkeypatch 该函数离线跑。
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 
 import ccxt
@@ -71,8 +71,9 @@ def _fetch_ohlcv_raw(pair: str, timeframe: str = "1d", limit: int = 400) -> list
 def _ohlcv_dataframe(symbol: str, curr_date: str | None = None) -> pd.DataFrame:
     """取 OHLCV 并整理成带 ``Date`` 列的 DataFrame。
 
-    ``curr_date`` 非空时过滤掉其之后的行，防止前视泄漏（与 yfinance 路径同义，
-    但 crypto 7×24 无休市，窗口内每天都有数据）。
+    ``curr_date`` 表示 UTC 决策日的开始时刻，只保留严格早于该日的已完成日线。
+    日线时间戳标记的是开盘而非收盘；使用 ``<=`` 会在历史回看时把该日完整
+    OHLC 当作开盘时已知，从而产生前视泄漏。
     """
     pair = _resolve_pair(symbol)
     raw = _fetch_ohlcv_raw(pair)
@@ -87,7 +88,13 @@ def _ohlcv_dataframe(symbol: str, curr_date: str | None = None) -> pd.DataFrame:
     df = df[["Date", "Open", "High", "Low", "Close", "Volume"]]
 
     if curr_date is not None:
-        df = df[df["Date"] <= pd.to_datetime(curr_date)]
+        cutoff = pd.to_datetime(curr_date)
+        # Exchanges normally include the currently forming UTC-day candle. Even
+        # if a caller asks for a future settlement cutoff, today's partial OHLC
+        # is not a completed daily bar and must not resolve a pending outcome.
+        today_utc = pd.to_datetime(datetime.now(timezone.utc).date())
+        cutoff = min(cutoff, today_utc)
+        df = df[df["Date"] < cutoff]
 
     if df.empty:
         raise NoMarketDataError(symbol, pair, "no rows on/before curr_date")
@@ -97,9 +104,9 @@ def _ohlcv_dataframe(symbol: str, curr_date: str | None = None) -> pd.DataFrame:
 def get_ccxt_data(
     symbol: Annotated[str, "crypto 资产符号，如 BTC 或 BTC/USDT"],
     start_date: Annotated[str, "起始日 yyyy-mm-dd"],
-    end_date: Annotated[str, "结束日 yyyy-mm-dd（含）"],
+    end_date: Annotated[str, "UTC 决策日 yyyy-mm-dd（不含当日未完成日线）"],
 ) -> str:
-    """``get_stock_data`` 的 ccxt 实现：返回带表头的 OHLCV CSV 字符串。"""
+    """返回决策日开始时已完成的 OHLCV，不包含 ``end_date`` 当日 K 线。"""
     datetime.strptime(start_date, "%Y-%m-%d")
     datetime.strptime(end_date, "%Y-%m-%d")
 

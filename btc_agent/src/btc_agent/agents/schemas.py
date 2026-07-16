@@ -21,19 +21,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
-
-# LLMs sometimes write a placeholder string ("None", "N/A", ...) into an optional
-# numeric field instead of omitting it. Coerce those to None so the structured
-# call validates instead of erroring (#1058). Pydantic still parses real numeric
-# strings ("189.5") to float.
-_NULLISH_FLOAT = {"", "none", "n/a", "na", "null", "nil", "-", "tbd", "unknown"}
-
-
-def _coerce_optional_float(value):
-    if isinstance(value, str) and value.strip().lower() in _NULLISH_FLOAT:
-        return None
-    return value
+from pydantic import BaseModel, Field
 
 
 # ---------------------------------------------------------------------------
@@ -55,9 +43,8 @@ class TraderAction(str, Enum):
     """3-tier transaction direction used by the Trader.
 
     The Trader's job is to translate the Research Manager's investment plan
-    into a concrete transaction proposal: should the desk execute a Buy, a
-    Sell, or sit on Hold this round.  Position sizing and the nuanced
-    Overweight / Underweight calls happen later at the Portfolio Manager.
+    into a directional proposal: Buy, Sell, or Hold. It never supplies trade
+    prices or sizing; deterministic downstream rules own those numbers.
     """
 
     BUY = "Buy"
@@ -75,16 +62,16 @@ class ResearchPlan(BaseModel):
 
     Hand-off to the Trader: the recommendation pins the directional view,
     the rationale captures which side of the bull/bear debate carried the
-    argument, and the strategic actions translate that into concrete
-    instructions the trader can execute against.
+    argument, and the strategic actions capture qualitative confirmation and
+    invalidation conditions without executable prices or sizing.
     """
 
     recommendation: PortfolioRating = Field(
         description=(
             "The investment recommendation. Exactly one of Buy / Overweight / "
-            "Hold / Underweight / Sell. Reserve Hold for situations where the "
-            "evidence on both sides is genuinely balanced; otherwise commit to "
-            "the side with the stronger arguments."
+            "Hold / Underweight / Sell. Use Hold whenever evidence is missing, "
+            "stale, thin, or genuinely balanced; otherwise choose the side with "
+            "the stronger evidence."
         ),
     )
     rationale: str = Field(
@@ -96,8 +83,8 @@ class ResearchPlan(BaseModel):
     )
     strategic_actions: str = Field(
         description=(
-            "Concrete steps for the trader to implement the recommendation, "
-            "including position sizing guidance consistent with the rating."
+            "Qualitative risk conditions that would strengthen or invalidate the recommendation. "
+            "Do not provide prices, stop levels, targets, percentages, or position sizing."
         ),
     )
 
@@ -122,9 +109,8 @@ class TraderProposal(BaseModel):
     """Structured transaction proposal produced by the Trader.
 
     The trader reads the Research Manager's investment plan and the analyst
-    reports, then turns them into a concrete transaction: what action to
-    take, the reasoning that justifies it, and the practical levels for
-    entry, stop-loss, and sizing.
+    reports, then makes only a directional recommendation plus reasoning.
+    All prices and sizing are computed later by deterministic code.
     """
 
     action: TraderAction = Field(
@@ -136,23 +122,6 @@ class TraderProposal(BaseModel):
             "the research plan. Two to four sentences."
         ),
     )
-    entry_price: float | None = Field(
-        default=None,
-        description="Optional entry price target in the instrument's quote currency.",
-    )
-    stop_loss: float | None = Field(
-        default=None,
-        description="Optional stop-loss price in the instrument's quote currency.",
-    )
-    position_sizing: str | None = Field(
-        default=None,
-        description="Optional sizing guidance, e.g. '5% of portfolio'.",
-    )
-
-    @field_validator("entry_price", "stop_loss", mode="before")
-    @classmethod
-    def _nullish_float_to_none(cls, v):
-        return _coerce_optional_float(v)
 
 
 def render_trader_proposal(proposal: TraderProposal) -> str:
@@ -167,12 +136,6 @@ def render_trader_proposal(proposal: TraderProposal) -> str:
         "",
         f"**Reasoning**: {proposal.reasoning}",
     ]
-    if proposal.entry_price is not None:
-        parts.extend(["", f"**Entry Price**: {proposal.entry_price}"])
-    if proposal.stop_loss is not None:
-        parts.extend(["", f"**Stop Loss**: {proposal.stop_loss}"])
-    if proposal.position_sizing:
-        parts.extend(["", f"**Position Sizing**: {proposal.position_sizing}"])
     parts.extend([
         "",
         f"FINAL TRANSACTION PROPOSAL: **{proposal.action.value.upper()}**",
@@ -202,8 +165,9 @@ class PortfolioDecision(BaseModel):
     )
     executive_summary: str = Field(
         description=(
-            "A concise action plan covering entry strategy, position sizing, "
-            "key risk levels, and time horizon. Two to four sentences."
+            "A concise directional conclusion and qualitative risk conditions. "
+            "Do not provide prices, stop levels, targets, percentages, position sizing, "
+            "or holding-period numbers. Two to four sentences."
         ),
     )
     investment_thesis: str = Field(
@@ -213,19 +177,6 @@ class PortfolioDecision(BaseModel):
             "incorporate them; otherwise rely solely on the current analysis."
         ),
     )
-    price_target: float | None = Field(
-        default=None,
-        description="Optional target price in the instrument's quote currency.",
-    )
-    time_horizon: str | None = Field(
-        default=None,
-        description="Optional recommended holding period, e.g. '3-6 months'.",
-    )
-
-    @field_validator("price_target", mode="before")
-    @classmethod
-    def _nullish_float_to_none(cls, v):
-        return _coerce_optional_float(v)
 
 
 def render_pm_decision(decision: PortfolioDecision) -> str:
@@ -243,10 +194,6 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
         "",
         f"**Investment Thesis**: {decision.investment_thesis}",
     ]
-    if decision.price_target is not None:
-        parts.extend(["", f"**Price Target**: {decision.price_target}"])
-    if decision.time_horizon:
-        parts.extend(["", f"**Time Horizon**: {decision.time_horizon}"])
     return "\n".join(parts)
 
 

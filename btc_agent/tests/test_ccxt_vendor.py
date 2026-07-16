@@ -4,6 +4,8 @@
 覆盖：OHLCV/指标结构、route_to_vendor 对 BTC 路由到 ccxt、fundamentals 已禁用。
 """
 
+from datetime import datetime, timezone
+
 import pytest
 
 from btc_agent.dataflows import ccxt_vendor, interface
@@ -36,6 +38,34 @@ def test_resolve_pair_defaults_to_usdt():
     assert ccxt_vendor._resolve_pair("BTC") == "BTC/USDT"
     assert ccxt_vendor._resolve_pair("eth") == "ETH/USDT"
     assert ccxt_vendor._resolve_pair("BTC/USD") == "BTC/USD"
+
+
+def test_asof_cutoff_excludes_same_day_candle(monkeypatch):
+    """日线 timestamp 是开盘时刻；决策日当天完整 OHLC 不可在开盘前可见。"""
+    day_ms = 86_400_000
+    base = int(datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
+    candles = [
+        [base, 100, 110, 90, 105, 1],
+        [base + day_ms, 105, 999, 1, 888, 1],
+    ]
+    monkeypatch.setattr(ccxt_vendor, "_fetch_ohlcv_raw", lambda *a, **k: candles)
+    df = ccxt_vendor._ohlcv_dataframe("BTC", curr_date="2021-01-02")
+    assert df["Close"].tolist() == [105]
+    rendered = ccxt_vendor.get_ccxt_data("BTC", "2021-01-01", "2021-01-02")
+    assert "105" in rendered
+    assert "888" not in rendered
+
+
+def test_indicator_asof_does_not_compute_from_same_day_candle(monkeypatch):
+    day_ms = 86_400_000
+    base = int(datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
+    candles = [
+        [base, 100, 110, 90, 105, 1],
+        [base + day_ms, 105, 999, 1, 888, 1],
+    ]
+    monkeypatch.setattr(ccxt_vendor, "_fetch_ohlcv_raw", lambda *a, **k: candles)
+    out = ccxt_vendor.get_ccxt_indicators_window("BTC", "rsi", "2021-01-02", 1)
+    assert "2021-01-02: N/A" in out
 
 
 def test_get_ccxt_data_returns_ohlcv_csv(patched_ohlcv):

@@ -31,7 +31,9 @@ def create_trader(llm):
                 "content": (
                     "You are a trading agent analyzing market data to make investment decisions. "
                     "Based on your analysis, provide a specific recommendation to buy, sell, or hold. "
-                    "Anchor your reasoning in the analysts' reports and the research plan."
+                    "Anchor your reasoning in the analysts' reports and the research plan. "
+                    "Output direction and reasoning only. Never provide entry/exit prices, stop-loss, "
+                    "targets, percentages, or position sizing; deterministic code owns all numbers."
                     + get_language_instruction()
                 ),
             },

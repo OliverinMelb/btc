@@ -1,5 +1,16 @@
 # v1 起步待办（清空上下文后从这里接）
 
+## ✅ 可靠性加固（2026-07-16）
+
+- 情报取数失败会随所有 sink 明示为“数据不完整/白卷”，不再把未知误报为“无异常”；
+- F&G 历史查询禁止回退当前值，资金费率/OI 无历史快照时交白卷，日线 as-of 只用已完成 UTC K 线；
+- pending 决策必须等完整持有窗口后结算，并按 Buy/Sell/Hold 方向换算策略收益再计算相对 BTC-HODL alpha；
+- Trader/Portfolio schema 删除入场、止损、目标价、仓位和持有期数字，LLM 只保留方向评级与定性理由；
+- 自由文本评级只接受明确 `Rating:` 标签或独立评级行，歧义输出按 Hold 降级并在记录中标注来源；
+- 配置的推送渠道未全部激活/送达时，intel CLI 返回非零退出码，方便计划任务发现失败。
+
+离线验收：ruff 全过，83 个 pytest 全绿；不包含真实 LLM 调用或外部推送。
+
 v0 已完成并端到端跑通（见 `BTC-DESIGN-REVIEW.md` 路线、`workflow/tasks/20260715-133420-v0-fork-ta/summary.md`、
 项目记忆 `v0-status.md`）。v1 是「情报层」，但**第一步先做最便宜最高价值的 crypto prompt 适配**。
 
@@ -43,9 +54,10 @@ Grayscale ETF 注入全链);(2) verified snapshot 对 crypto 改走 ccxt(原硬�
 
 验收:51 离线单测全绿(v1 情报层新增 26)、ruff 全过、契约漂移检查 OK、intel CLI 真数据端到端。
 
-**v1 晋级条件「稳定推送」剩最后一步(需你):** 配 `TELEGRAM_BOT_TOKEN`+`TELEGRAM_CHAT_ID`
-后把 `intel_push_sinks` 加 "telegram",再挂个定时器(Windows 计划任务 / cron)定时跑
-`python -m btc_agent.intel`。新闻 vendor 真跑需 `CRYPTOPANIC_API_TOKEN`(免费注册)。
+**v1 晋级条件「稳定推送」仍需部署侧完成：** 任选并配置 Email、飞书或 Telegram 凭据，
+再挂 Windows 计划任务 / cron 定时运行 `python -m btc_agent.intel`，并让调度器监控非零退出码。
+新闻默认使用零 key 的 Crypto RSS；只有主动切回付费 CryptoPanic 时才需要
+`CRYPTOPANIC_API_TOKEN`。
 
 ## 原始 v1 待办（存档）
 - CryptoPanic 新闻 vendor（和 ccxt vendor 同构）

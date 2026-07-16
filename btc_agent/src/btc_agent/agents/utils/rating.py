@@ -22,17 +22,20 @@ _RATING_SET = {r.lower() for r in RATINGS_5_TIER}
 
 # Matches "Rating: X" / "rating - X" / "Rating: **X**" — tolerates markdown
 # bold wrappers and either a colon or hyphen separator.
-_RATING_LABEL_RE = re.compile(r"rating.*?[:\-][\s*]*(\w+)", re.IGNORECASE)
+_RATING_LABEL_RE = re.compile(
+    r"^\s*\*{0,2}rating\*{0,2}\s*[:\-]\s*\*{0,2}(\w+)",
+    re.IGNORECASE,
+)
 
 
-def parse_rating(text: str, default: str = "Hold") -> str:
-    """Heuristically extract a 5-tier rating from prose text.
+def extract_rating(text: str) -> str | None:
+    """Extract an explicitly labelled or standalone 5-tier rating.
 
-    Two-pass strategy:
-    1. Look for an explicit "Rating: X" label (tolerant of markdown bold).
-    2. Fall back to the first 5-tier rating word found anywhere in the text.
-
-    Returns a Title-cased rating string, or ``default`` if no rating word appears.
+    Arbitrary prose is deliberately *not* scanned for the first rating word.  A
+    sentence such as ``"not Buy; prefer Sell"`` must never be inverted to Buy
+    merely because that token appeared first.  Structured output renders an
+    explicit ``Rating: X`` label; conservative free-text fallbacks may return a
+    single standalone rating line.
     """
     for line in text.splitlines():
         m = _RATING_LABEL_RE.search(line)
@@ -40,9 +43,14 @@ def parse_rating(text: str, default: str = "Hold") -> str:
             return m.group(1).capitalize()
 
     for line in text.splitlines():
-        for word in line.lower().split():
-            clean = word.strip("*:.,")
-            if clean in _RATING_SET:
-                return clean.capitalize()
+        clean = line.strip().strip("*:.,").lower()
+        if clean in _RATING_SET:
+            return clean.capitalize()
 
-    return default
+    return None
+
+
+def parse_rating(text: str, default: str = "Hold") -> str:
+    """Return an explicit rating, or the fail-safe ``default`` (normally Hold)."""
+
+    return extract_rating(text) or default

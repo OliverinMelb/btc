@@ -40,6 +40,8 @@ unclear, the evidence is thin or conflicting, or neither side's argument is deci
 Hold (a deliberate no-trade / blank answer) over manufacturing a directional call. A disciplined
 Hold in an unclear regime is the correct answer, not a failure to decide. Only commit to
 Buy/Overweight/Underweight/Sell when the debate's strongest arguments genuinely warrant it.
+Provide rating and qualitative reasoning only. Never produce entry/exit prices, stop-loss,
+targets, percentages, or position sizing; deterministic downstream rules own all trade numbers.
 
 ---
 

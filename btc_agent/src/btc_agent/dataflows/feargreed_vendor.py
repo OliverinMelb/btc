@@ -32,13 +32,20 @@ def get_fear_greed_value(curr_date: str | None = None, look_back_days: int = 0) 
     ``look_back_days`` > 0 时会取更长窗口,但本函数只返回窗口内最新一条(<= curr_date)。
     纯数据形态,供仪表盘/规则引擎消费(区别于给 LLM 的格式化文本)。
     """
-    limit = max(1, look_back_days + 1)
+    cutoff = datetime.strptime(curr_date, "%Y-%m-%d") if curr_date else None
+    # 该 API 从今天向过去返回 limit 条。历史 as-of 查询必须覆盖今天到 cutoff
+    # 的距离，否则 limit=1 只会拿到今天并造成前视回退。
+    history_days = (
+        max(0, (datetime.now(timezone.utc).date() - cutoff.date()).days) + 2
+        if cutoff
+        else 1
+    )
+    limit = max(1, look_back_days + 1, history_days)
     data = _request(limit)
     rows = data.get("data", [])
     if not rows:
         raise ValueError("Fear & Greed API returned no data.")
 
-    cutoff = datetime.strptime(curr_date, "%Y-%m-%d") if curr_date else None
     chosen = None
     for row in rows:  # 端点按时间倒序返回,第一条满足 <= cutoff 的即最新
         ts = row.get("timestamp")
@@ -47,12 +54,13 @@ def get_fear_greed_value(curr_date: str | None = None, look_back_days: int = 0) 
             if ts is not None
             else None
         )
-        if cutoff is not None and row_dt is not None and row_dt > cutoff:
-            continue
+        if cutoff is not None:
+            if row_dt is None or row_dt > cutoff:
+                continue
         chosen = (row, row_dt)
         break
     if chosen is None:
-        chosen = (rows[0], None)
+        raise ValueError(f"Fear & Greed API has no data on/before {curr_date}.")
 
     row, row_dt = chosen
     return {
