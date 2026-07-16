@@ -157,6 +157,24 @@ def test_g6d_expiry_close_settlement_when_untouched(tmp_path):
     assert market_return == pytest.approx(-0.02)
 
 
+def test_creation_day_double_touch_is_not_settled(tmp_path):
+    """contract-backfill 子任务 F1: 创建当日即双触(Low<=失效位 且 High>=目标)不应
+    被计入结算窗口(前视防护)——``ohlcv_provider`` 只有创建当日这一根 K 线可用时,
+    ``settle_due_candidates`` 必须不产生任何结算行(次日起才是有效结算窗口起点)。"""
+    conn = _db(tmp_path)
+    _insert_candidate(conn, "BTC-creation-day", creation_date="2026-07-16")
+    # 创建当日(07-16)本身双触: Low<=90(失效) 且 High>=105(目标)。若前视防护被
+    # 回退,结算器会在创建当日就把这根 K 线判定为 invalidated。
+    provider = _provider_from({"2026-07-16": (85.0, 108.0, 95.0)})
+
+    settled = settlement_mod.settle_due_candidates(
+        conn, ohlcv_provider=provider, as_of_utc="2026-07-18T00:00:00Z"
+    )
+
+    assert settled == []
+    assert conn.execute("SELECT COUNT(*) FROM settlements").fetchone()[0] == 0
+
+
 def test_settlement_not_due_yet_is_skipped(tmp_path):
     """未到期且未触位: 本轮不结算(不产生 settlements 行)。"""
     conn = _db(tmp_path)

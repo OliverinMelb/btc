@@ -12,23 +12,18 @@
 
 A subtask is not review-ready until its independent re-verification is PASS.
 
-## Backend Only
-Run from `ai_helper_backend`:
+## Agent Change (this project's only component)
+Run from `btc_agent` (shared venv, fully offline):
 - `python -m pytest`
 - `python -m ruff check .`
 
-## Frontend Only
-Run from `ai_helper_frontend`:
-- `npm run test`
-- `npm run typecheck`
-- `npm run build`
-
 ## Contract Change
-Run both backend and frontend checks, then:
-- `python workflow/scripts/check_contract_touchpoints.py`
-- `python workflow/scripts/check_env_consistency.py`
+Run the agent checks above, then (from the repo root, or via
+`{engine}/run_contract_drift.py`):
+- `python {engine}/check_contract_touchpoints.py`
+- `python {engine}/check_env_consistency.py`
 
 ## Workflow-Only Change
 Run from repo root:
-- `python workflow/scripts/check_env_consistency.py`
-- `python workflow/scripts/check_contract_touchpoints.py`
+- `python {engine}/check_env_consistency.py`
+- `python {engine}/check_contract_touchpoints.py`

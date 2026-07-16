@@ -16,6 +16,17 @@ G6 候选结算三口径(定死,任一变更即新策略版本——见 ``ledger
 的结构性方向),与 LLM 裁决(accept/observe/veto)无关——被否决的候选照常按同一
 口径结算,``counterfactual_report`` 按裁决分组对比,量化"如果都按 accept 执行"
 与"实际被接受的"两组结果差异,这是 LLM 增量价值的证据来源。
+
+**alpha 恒为 0(设计如此,非 bug)**:``settle_due_candidates`` 调用
+``spot_settle("long", market_return=r, bench_return=r)``——基准收益与市场收益
+传的是同一个数(bench=market),这里没有独立的"买入持有基准"概念,候选结算只是
+把机械触位结果换算成收益率。按 ``settlement_math.spot_settle`` 的 long 分支,
+``alpha = strategy_return - bench_return``,两者相等故恒为 0——这不是漏配置,
+是候选层反事实归因的设计选择:``counterfactual_report`` 与任何消费
+``settlements.alpha`` 列的候选组统计,只应看 ``strategy_return``/``direction_hit``
+(即 ``hit_rate``),不要指望这里的 alpha 列能反映"跑赢大盘"的信息——那个概念
+属于 ST1 的 reflection/memory 口径(整仓评级 vs BTC-HODL 基准),与候选层是两套
+不同的统计对象,不要混用。
 """
 
 from __future__ import annotations
@@ -188,6 +199,9 @@ def counterfactual_report(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     两组的结算价位/结算方式完全同口径(见 ``settle_due_candidates``);唯一差异是
     裁决标签——这正是量化"LLM 裁决增量价值"的证据:若 accepted 组均值/命中率显著
     优于 vetoed/observed 组,说明裁决点确有过滤价值。
+
+    只统计 ``avg_strategy_return``/``hit_rate``(不含 alpha):``settlements.alpha``
+    在候选口径下恒为 0(bench=market 设计,见模块 docstring),对分组对比没有信息量。
     """
     cur = conn.cursor()
     rows = cur.execute(
