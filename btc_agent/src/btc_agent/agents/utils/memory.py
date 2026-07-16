@@ -104,6 +104,8 @@ class TradingMemoryLog:
         alpha_return: float,
         holding_days: int,
         reflection: str,
+        direction_hit: bool | None = None,
+        settlement_basis: str = "spot",
     ) -> None:
         """Replace pending tag and append REFLECTION section using atomic write.
 
@@ -140,9 +142,9 @@ class TradingMemoryLog:
                 # Parse rating from the existing pending tag
                 fields = [f.strip() for f in tag_line[1:-1].split("|")]
                 rating = fields[2]
-                new_tag = (
-                    f"[{trade_date} | {ticker} | {rating}"
-                    f" | {raw_pct} | {alpha_pct} | {holding_days}d]"
+                new_tag = self._build_resolved_tag(
+                    trade_date, ticker, rating, raw_pct, alpha_pct, holding_days,
+                    direction_hit=direction_hit, settlement_basis=settlement_basis,
                 )
                 rest = "\n".join(lines[1:])
                 new_blocks.append(
@@ -194,9 +196,10 @@ class TradingMemoryLog:
                     rating = fields[2]
                     raw_pct = f"{upd['raw_return']:+.1%}"
                     alpha_pct = f"{upd['alpha_return']:+.1%}"
-                    new_tag = (
-                        f"[{trade_date} | {ticker} | {rating}"
-                        f" | {raw_pct} | {alpha_pct} | {upd['holding_days']}d]"
+                    new_tag = self._build_resolved_tag(
+                        trade_date, ticker, rating, raw_pct, alpha_pct, upd["holding_days"],
+                        direction_hit=upd.get("direction_hit"),
+                        settlement_basis=upd.get("settlement_basis", "spot"),
                     )
                     rest = "\n".join(lines[1:])
                     new_blocks.append(
@@ -216,6 +219,36 @@ class TradingMemoryLog:
         tmp_path.replace(self._log_path)
 
     # --- Helpers ---
+
+    @staticmethod
+    def _build_resolved_tag(
+        trade_date: str,
+        ticker: str,
+        rating: str,
+        raw_pct: str,
+        alpha_pct: str,
+        holding_days: int,
+        direction_hit: bool | None = None,
+        settlement_basis: str = "spot",
+    ) -> str:
+        """Build a resolved-entry tag line, spot-basis tail appended at the end.
+
+        Pending-tag format and the first 6 legacy fields are untouched by
+        design (``store_decision``'s idempotency scan and ``_parse_entry``'s
+        pending detection both key off tag-line prefixes/suffixes that predate
+        this tail). New info is appended so old parsers degrade gracefully.
+        ``hit`` is omitted entirely when ``direction_hit`` is ``None`` (no
+        directional call was made, e.g. Hold/flat).
+        """
+        tag = (
+            f"[{trade_date} | {ticker} | {rating}"
+            f" | {raw_pct} | {alpha_pct} | {holding_days}d"
+            f" | basis={settlement_basis}"
+        )
+        if direction_hit is not None:
+            tag += f" | hit={1 if direction_hit else 0}"
+        tag += "]"
+        return tag
 
     def _apply_rotation(self, blocks: list[str]) -> list[str]:
         """Drop oldest resolved blocks when their count exceeds max_entries.
@@ -264,14 +297,30 @@ class TradingMemoryLog:
         fields = [f.strip() for f in tag_line[1:-1].split("|")]
         if len(fields) < 4:
             return None
+        pending = fields[3] == "pending"
+        # Tail fields (index >= 6) are the spot-basis extension appended by
+        # _build_resolved_tag: "basis=<...>" and optionally "hit=<0/1>". Their
+        # absence (len(fields) == 6, the pre-existing resolved-entry shape)
+        # means this entry was settled under the old short-basis math.
+        basis = None
+        direction_hit = None
+        if not pending:
+            basis = "legacy"
+            for f in fields[6:]:
+                if f.startswith("basis="):
+                    basis = f.split("=", 1)[1]
+                elif f.startswith("hit="):
+                    direction_hit = f.split("=", 1)[1] == "1"
         entry = {
             "date": fields[0],
             "ticker": fields[1],
             "rating": fields[2],
-            "pending": fields[3] == "pending",
-            "raw": fields[3] if fields[3] != "pending" else None,
+            "pending": pending,
+            "raw": fields[3] if not pending else None,
             "alpha": fields[4] if len(fields) > 4 else None,
             "holding": fields[5] if len(fields) > 5 else None,
+            "settlement_basis": basis,
+            "direction_hit": direction_hit,
         }
         body = "\n".join(lines[1:]).strip()
         decision_match = self._DECISION_RE.search(body)
@@ -285,6 +334,8 @@ class TradingMemoryLog:
         alpha = e["alpha"] or "n/a"
         holding = e["holding"] or "n/a"
         tag = f"[{e['date']} | {e['ticker']} | {e['rating']} | {raw} | {alpha} | {holding}]"
+        if e.get("settlement_basis") == "legacy":
+            tag += " (legacy short-basis)"
         parts = [tag, f"DECISION:\n{e['decision']}"]
         if e["reflection"]:
             parts.append(f"REFLECTION:\n{e['reflection']}")
@@ -292,6 +343,8 @@ class TradingMemoryLog:
 
     def _format_reflection_only(self, e: dict) -> str:
         tag = f"[{e['date']} | {e['ticker']} | {e['rating']} | {e['raw'] or 'n/a'}]"
+        if e.get("settlement_basis") == "legacy":
+            tag += " (legacy short-basis)"
         if e["reflection"]:
             return f"{tag}\n{e['reflection']}"
         text = e["decision"][:300]

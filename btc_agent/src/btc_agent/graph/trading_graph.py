@@ -252,15 +252,23 @@ class TradingAgentsGraph:
         self, ticker: str, trade_date: str, holding_days: int = 5,
         benchmark: str = "BTC/USDT",
         rating: str = "Buy",
-    ) -> tuple[float | None, float | None, int | None]:
-        """Fetch direction-adjusted strategy return and alpha over ``holding_days``.
+    ) -> tuple[float | None, float | None, int | None, bool | None, str | None]:
+        """Fetch spot-settled strategy return and alpha over ``holding_days``.
 
         Crypto is 7×24: the holding window is ``holding_days`` CONTINUOUS UTC days
         with no weekend/holiday buffer (unlike the equity path this replaces).
         Prices come from the ccxt vendor, not yfinance. ``benchmark`` is the
         BTC-HODL baseline symbol (resolved by the caller via ``_resolve_benchmark``).
-        Returns ``(raw_return, alpha_return, actual_holding_days)`` or
-        ``(None, None, None)`` if price data is unavailable (too recent / network).
+
+        Settlement is spot-only (see ``settlement_math.spot_settle``): a Sell
+        rating cannot profit from the market falling, it can only avoid the
+        market move, so its strategy_return is 0 and its alpha is the missed
+        benchmark return. ``direction_hit`` is tracked separately so a correct
+        bearish call is still visible even though it earned nothing.
+
+        Returns ``(raw_return, alpha_return, actual_holding_days, direction_hit,
+        settlement_basis)`` or ``(None, None, None, None, None)`` if price data
+        is unavailable (too recent / network).
         """
         from btc_agent.dataflows.ccxt_vendor import _ohlcv_dataframe
 
@@ -283,28 +291,29 @@ class TradingAgentsGraph:
             # Never settle a five-day decision after only one or two elapsed days.
             required = holding_days + 1
             if len(stock) < required or len(bench) < required:
-                return None, None, None
+                return None, None, None, None, None
 
             market_return = float((stock[holding_days] - stock[0]) / stock[0])
             bench_ret = float((bench[holding_days] - bench[0]) / bench[0])
 
+            from btc_agent.settlement_math import spot_settle
             from btc_agent.trade_levels import rating_to_direction
 
             direction = rating_to_direction(rating)
-            if direction == "long":
-                strategy_return = market_return
-            elif direction == "short":
-                strategy_return = -market_return
-            else:
-                strategy_return = 0.0
-            alpha = strategy_return - bench_ret
-            return strategy_return, alpha, holding_days
+            settled = spot_settle(direction, market_return, bench_ret)
+            return (
+                settled["strategy_return"],
+                settled["alpha"],
+                holding_days,
+                settled["direction_hit"],
+                settled["settlement_basis"],
+            )
         except Exception as e:
             logger.warning(
                 "Could not resolve outcome for %s on %s vs %s (will retry next run): %s",
                 ticker, trade_date, benchmark, e,
             )
-            return None, None, None
+            return None, None, None, None, None
 
     def _resolve_pending_entries(self, ticker: str) -> None:
         """Resolve pending log entries for ticker at the start of a new run.
@@ -326,7 +335,7 @@ class TradingAgentsGraph:
         benchmark_label = self.config.get("benchmark_label") or benchmark
         updates = []
         for entry in pending:
-            raw, alpha, days = self._fetch_returns(
+            raw, alpha, days, direction_hit, basis = self._fetch_returns(
                 ticker, entry["date"], benchmark=benchmark, rating=entry["rating"],
             )
             if raw is None:
@@ -336,6 +345,7 @@ class TradingAgentsGraph:
                 raw_return=raw,
                 alpha_return=alpha,
                 benchmark_name=benchmark_label,
+                direction_hit=direction_hit,
             )
             updates.append({
                 "ticker": ticker,
@@ -344,6 +354,8 @@ class TradingAgentsGraph:
                 "alpha_return": alpha,
                 "holding_days": days,
                 "reflection": reflection,
+                "direction_hit": direction_hit,
+                "settlement_basis": basis,
             })
 
         if updates:

@@ -57,37 +57,50 @@ def test_fetch_returns_uses_ccxt_not_yfinance(patched_ohlcv, tmp_path):
     cfg = dict(DEFAULT_CONFIG)
     graph = TradingAgentsGraph.__new__(TradingAgentsGraph)
     graph.config = cfg
-    raw, alpha, days = graph._fetch_returns(
+    raw, alpha, days, direction_hit, basis = graph._fetch_returns(
         "BTC", "2021-01-05", holding_days=5, benchmark="BTC/USDT"
     )
     assert raw is not None
     assert days == 5  # 连续 5 个 UTC 天，无周末跳过
     # BTC 资产 vs BTC-HODL 基准在 v0 退化：raw≈benchmark → alpha≈0（已知局限）
     assert abs(alpha) < 1e-9
+    assert direction_hit is True  # 默认 rating="Buy"，市场上涨 → 命中
+    assert basis == "spot"
 
 
 @pytest.mark.parametrize(
     ("rating", "strategy_sign"),
-    [("Buy", 1), ("Sell", -1), ("Hold", 0)],
+    [("Buy", 1), ("Sell", 0), ("Hold", 0)],
 )
-def test_fetch_returns_applies_decision_direction(
+def test_fetch_returns_applies_spot_settlement(
     patched_ohlcv, tmp_path, rating, strategy_sign
 ):
+    """现货口径:Sell/Hold 均结算为 0 收益(不能靠做空获利),仅 Buy 吃到市场收益。"""
     graph = TradingAgentsGraph.__new__(TradingAgentsGraph)
     graph.config = dict(DEFAULT_CONFIG)
-    strategy_return, alpha, days = graph._fetch_returns(
+    strategy_return, alpha, days, direction_hit, basis = graph._fetch_returns(
         "BTC", "2021-01-05", holding_days=5, benchmark="BTC/USDT", rating=rating
     )
     market_return = (1.01 ** 5) - 1
     assert strategy_return == pytest.approx(strategy_sign * market_return)
-    assert alpha == pytest.approx(strategy_return - market_return)
+    if rating == "Buy":
+        assert alpha == pytest.approx(strategy_return - market_return)
+        assert direction_hit is True
+    else:
+        # short/flat 现货口径:alpha = -bench_return(踏空成本)
+        assert alpha == pytest.approx(-market_return)
+        if rating == "Sell":
+            assert direction_hit is False  # 市场上涨,做空方向判断错误
+        else:
+            assert direction_hit is None  # Hold/flat 未做方向判断
     assert days == 5
+    assert basis == "spot"
 
 
 def test_return_window_starts_at_same_close_as_mechanical_entry(patched_ohlcv):
     graph = TradingAgentsGraph.__new__(TradingAgentsGraph)
     graph.config = dict(DEFAULT_CONFIG)
-    strategy_return, _, _ = graph._fetch_returns(
+    strategy_return, _, _, _, _ = graph._fetch_returns(
         "BTC", "2021-01-05", holding_days=1, benchmark="BTC/USDT", rating="Buy"
     )
     # Entry at start of Jan 5 equals Jan 4 completed close; one day later uses Jan 5 close.
@@ -101,7 +114,7 @@ def test_fetch_returns_waits_for_full_holding_window(monkeypatch):
     graph.config = dict(DEFAULT_CONFIG)
     assert graph._fetch_returns(
         "BTC", "2021-01-01", holding_days=5, benchmark="BTC/USDT", rating="Buy"
-    ) == (None, None, None)
+    ) == (None, None, None, None, None)
 
 
 def test_settlement_window_is_continuous_no_weekend_skip(patched_ohlcv, tmp_path):
@@ -113,7 +126,7 @@ def test_settlement_window_is_continuous_no_weekend_skip(patched_ohlcv, tmp_path
     graph = TradingAgentsGraph.__new__(TradingAgentsGraph)
     graph.config = cfg
     # trade_date 周二；若按股票日历会跳周末导致 actual_days<5，crypto 应正好 5
-    _, _, days = graph._fetch_returns(
+    _, _, days, _, _ = graph._fetch_returns(
         "BTC", "2021-01-05", holding_days=5, benchmark="BTC/USDT"
     )
     weekday_sat = datetime.strptime("2021-01-05", "%Y-%m-%d") + timedelta(days=4)
