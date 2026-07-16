@@ -14,8 +14,10 @@ sink 推送。白卷路径(chaos/insufficient_data)**不构造/不调用研判�
 扩展点:``candidate_provider(snapshot, regime_result) -> Any | None``、
 ``ledger_recorder(snapshot, regime_result, rating, reasoning, levels, candidates) -> None``。
 ``candidate_provider`` 未显式注入时默认接线为 ``candidates.default_candidate_provider``
-(ST5:机械候选 + 有候选时的 LLM 裁决);显式传 ``None`` 才跳过。``ledger_recorder``
-默认仍为 ``None``(ST6 加挂点)。
+(ST5:机械候选 + 有候选时的 LLM 裁决);显式传 ``None`` 才跳过。``run_daily`` 本身
+``ledger_recorder`` 参数默认仍为 ``None``(保持库函数零副作用,便于测试/复用);
+CLI 入口 ``main()`` 默认接线为 ``_build_default_ledger_recorder``(ST6:写
+SQLite 账本 + 顺带触发到期结算,``DEFAULT_CONFIG`` 的 ``ledger_enabled`` 键可关)。
 
 推送失败/未完整送达 → 非零退出码(语义沿用 v1 情报层 ``run_intel``,代码独立实现,
 不改 ``run_intel.py`` 本身)。
@@ -131,6 +133,44 @@ def run_daily(
     }
 
 
+def _build_default_ledger_recorder(cfg: dict):
+    """CLI 默认账本接线(ST6):写 SQLite 账本 + 顺带触发到期结算。
+
+    ``cfg["ledger_enabled"]`` 为 ``False`` 时返回 ``None``(不接线,等价于旧行为)。
+    只在真正调用一次(CLI 真实运行,已过 ``DEEPSEEK_API_KEY`` 校验)时才 import/连接
+    数据库——避免给 ``run_daily`` 库函数调用方(含全部离线单测)引入隐式副作用。
+    """
+    if not cfg.get("ledger_enabled", True):
+        return None
+
+    from btc_agent.ledger import (
+        connect,
+        default_db_path,
+        default_strategy_version_id,
+        record_daily,
+    )
+    from btc_agent.settlement import settle_due_candidates
+
+    db_path = cfg.get("ledger_db_path") or default_db_path(cfg.get("results_dir"))
+    conn = connect(db_path)
+    strategy_version_id = default_strategy_version_id(conn)
+
+    def _recorder(snapshot, regime_result, rating, reasoning, levels, candidates):
+        record_daily(
+            conn,
+            snapshot,
+            regime_result,
+            rating,
+            reasoning,
+            levels,
+            candidates,
+            strategy_version_id=strategy_version_id,
+        )
+        settle_due_candidates(conn)
+
+    return _recorder
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="btc_agent.daily",
@@ -147,7 +187,8 @@ def main(argv: list[str] | None = None) -> int:
             "离线测试请走 btc_agent.daily.run_daily(graph=<mock>, snapshot=<mock>)。\n",
         )
 
-    result = run_daily(asset=args.asset, trade_date=args.date)
+    ledger_recorder = _build_default_ledger_recorder(dict(DEFAULT_CONFIG))
+    result = run_daily(asset=args.asset, trade_date=args.date, ledger_recorder=ledger_recorder)
     print(result["card"])
     if not result["delivery_complete"]:
         print(
