@@ -9,14 +9,19 @@
 1. **月度评级统计**——``trade_levels.rating`` 与 ``snapshots.observations_json``
    (``last_close``)按 ``trade_date`` join 出 (date, rating, close) 序列,5 日持有
    收益/命中率/alpha 自算(不依赖 markdown 记忆日志的结算,那份不是统计真源)。
-   命中/alpha 定义:``market_return = close[t+horizon]/close[t]-1``;方向映射
-   ``Buy/Overweight→+1、Underweight/Sell→-1、Hold→0``;
-   ``strategy_return = sign * market_return``;``alpha = strategy_return -
-   market_return``(基准是同期 BTC 现货买入持有,呼应 ``settlement.py`` 文档里提到
-   的 ST1 "整仓评级 vs BTC-HODL" 概念,候选层的 ``counterfactual_report`` 不做这件
-   事)。``sign == 0``(Hold)不计入命中率分母。t+horizon 若在 ledger 里还没有收盘
-   数据(尾部/近期条目)记 ``pending``,不计入统计——**为此评级统计的 close 序列
-   查询不按月份过滤**(月份只过滤"评级发生日"这一端,前视窗口允许跨月)。
+   **结算口径只有一个 source of truth**:``settlement_math.spot_settle``——本模块
+   不手写第二套结算数学。``market_return = close[t+horizon]/close[t]-1``;方向用
+   ``trade_levels.rating_to_direction(rating)`` 映射到 ``long``/``short``/``flat``
+   (``Buy``/``Overweight``→long,``Underweight``/``Sell``→short,``Hold``→flat);
+   逐条调用 ``spot_settle(direction, market_return, bench_return=market_return)``
+   (基准=同期 BTC 现货买入持有,呼应 ``settlement.py`` 文档里提到的 ST1 "整仓评级
+   vs BTC-HODL" 概念,候选层的 ``counterfactual_report`` 不做这件事)。**现货系统
+   不能靠"看空"获利**:``short``/``flat`` 的 ``strategy_return`` 恒为 0,
+   ``alpha = -bench_return``(踏空的机会成本);``direction_hit`` 只在
+   ``long``(``market_return>0``)/``short``(``market_return<0``)时给出真值,
+   ``flat``(Hold)恒为 ``None``,不计入命中率分母。t+horizon 若在 ledger 里还没有
+   收盘数据(尾部/近期条目)记 ``pending``,不计入统计——**为此评级统计的 close
+   序列查询不按月份过滤**(月份只过滤"评级发生日"这一端,前视窗口允许跨月)。
 
 2. **候选分组对比**——直接复用 ``settlement.counterfactual_report``(accept vs
    vetoed/observed),账本全量口径,不做月度切片(候选的结算时点与创建时点本就
@@ -49,6 +54,9 @@ import sqlite3
 from datetime import date, timedelta
 from typing import Any
 
+from btc_agent.settlement_math import spot_settle
+from btc_agent.trade_levels import rating_to_direction
+
 # 报表层机械仓位参数——json 可序列化,与策略版本 hash 无关(报表口径,非策略口径)。
 REPORT_PARAMS: dict[str, Any] = {
     "position_weights": {
@@ -63,13 +71,6 @@ REPORT_PARAMS: dict[str, Any] = {
     "hit_horizon_days": 5,
 }
 
-_DIRECTION_SIGN: dict[str, int] = {
-    "Buy": 1,
-    "Overweight": 1,
-    "Underweight": -1,
-    "Sell": -1,
-    "Hold": 0,
-}
 _RATING_ORDER = ["Buy", "Overweight", "Hold", "Underweight", "Sell"]
 
 
@@ -142,7 +143,7 @@ def rating_stats(
     pending = 0
     no_close = 0
     for trade_date, rating in ratings:
-        if rating not in _DIRECTION_SIGN:
+        if rating not in _RATING_ORDER:
             continue  # 未知/None 评级(白卷等),不计入评级统计
         entry_close = closes.get(trade_date)
         if entry_close is None:
@@ -154,16 +155,14 @@ def rating_stats(
             pending += 1
             continue
         market_return = (exit_close - entry_close) / entry_close
-        sign = _DIRECTION_SIGN[rating]
-        strategy_return = sign * market_return
-        alpha = strategy_return - market_return
-        hit = None if sign == 0 else (strategy_return > 0)
+        direction = rating_to_direction(rating)
+        settled = spot_settle(direction, market_return, bench_return=market_return)
         groups[rating].append(
             {
                 "market_return": market_return,
-                "strategy_return": strategy_return,
-                "alpha": alpha,
-                "hit": hit,
+                "strategy_return": settled["strategy_return"],
+                "alpha": settled["alpha"],
+                "hit": settled["direction_hit"],
             }
         )
 

@@ -120,6 +120,19 @@ def test_report_module_does_not_import_graph_intel_llm():
         assert forbidden not in src
 
 
+def test_report_does_not_hand_roll_settlement_math():
+    """结算口径只有一个 source of truth: settlement_math.spot_settle。
+
+    防回归: report.py 不得手写第二套结算数学(如 sign*market_return 的做空口径),
+    必须 import settlement_math 并复用 spot_settle。
+    """
+    src = inspect.getsource(report_mod)
+    assert "settlement_math" in src
+    assert "spot_settle" in src
+    for forbidden in ("sign * market_return", "sign*market_return", "_DIRECTION_SIGN"):
+        assert forbidden not in src
+
+
 # ---------------------------------------------------------------------------
 # 净值回放
 # ---------------------------------------------------------------------------
@@ -200,18 +213,22 @@ def test_rating_stats_hit_rate_alpha_and_pending_tail(tmp_path):
     assert stats["per_rating"]["Buy"]["avg_alpha"] == pytest.approx(0.0)
     assert stats["per_rating"]["Buy"]["hit_rate"] == pytest.approx(1.0)
 
+    # 现货口径(settlement_math.spot_settle):Underweight/Sell 映射到 short,
+    # 现货系统不能靠"看空"获利 → strategy_return 恒为 0,alpha=-market_return
+    # (踏空机会成本),direction_hit = market_return < 0。
     uw_market = (95.0 - 105.0) / 105.0
-    uw_strategy = -1 * uw_market
     assert stats["per_rating"]["Underweight"]["count"] == 1
     assert stats["per_rating"]["Underweight"]["avg_market_return"] == pytest.approx(uw_market)
-    assert stats["per_rating"]["Underweight"]["avg_strategy_return"] == pytest.approx(uw_strategy)
-    assert stats["per_rating"]["Underweight"]["avg_alpha"] == pytest.approx(uw_strategy - uw_market)
-    assert stats["per_rating"]["Underweight"]["hit_rate"] == pytest.approx(1.0)
+    assert stats["per_rating"]["Underweight"]["avg_strategy_return"] == pytest.approx(0.0)
+    assert stats["per_rating"]["Underweight"]["avg_alpha"] == pytest.approx(-uw_market)
+    assert stats["per_rating"]["Underweight"]["hit_rate"] == pytest.approx(1.0)  # uw_market < 0
 
+    # Hold → flat: strategy_return=0, alpha=-market_return, direction_hit=None(不计入命中分母)。
     hold_market = (115.0 - 110.0) / 110.0
     assert stats["per_rating"]["Hold"]["count"] == 1
     assert stats["per_rating"]["Hold"]["avg_market_return"] == pytest.approx(hold_market)
     assert stats["per_rating"]["Hold"]["avg_strategy_return"] == pytest.approx(0.0)
+    assert stats["per_rating"]["Hold"]["avg_alpha"] == pytest.approx(-hold_market)
     assert stats["per_rating"]["Hold"]["hit_rate"] is None  # Hold 无方向, 不计入命中分母
 
     assert stats["pending"] == 1  # 07-28 的 Buy, t+5 (08-02) 无数据
