@@ -92,3 +92,64 @@ def test_cli_returns_nonzero_when_delivery_is_incomplete(monkeypatch):
         },
     )
     assert run_intel.main([]) == 1
+
+
+def _healthy_quiet_dashboard(asset, curr_date):
+    """无告警且数据健康的仪表盘(所有信号取到但都不触发规则)。"""
+    return {
+        "asset": asset, "curr_date": curr_date,
+        "fear_greed": {"value": 50, "classification": "Neutral"},
+        "derivatives": {"funding_rate": 0.00001, "open_interest": 1e9},
+        "rsi": 55.0,
+        "price_move_pct": 0.5,
+        "close": 64000.0,
+        "errors": {},
+    }
+
+
+def test_alerts_only_skips_push_when_quiet(monkeypatch, capsys):
+    """--alerts-only:无告警且无取数错误 → 跳过推送,送达按完整计(退出码 0 语义)。"""
+    monkeypatch.setattr(run_intel, "build_dashboard", _healthy_quiet_dashboard)
+    result = run_intel.run_intel(
+        asset="BTC", curr_date="2026-07-15",
+        config={"intel_push_sinks": ["stdout"]}, alerts_only=True,
+    )
+    assert result["alerts"] == []
+    assert result["skipped_no_alerts"] is True
+    assert result["delivery_complete"] is True
+    assert result["active_sinks"] == []
+    # stdout sink 未被调用 → 无消息输出
+    assert "盘面告警" not in capsys.readouterr().out
+
+
+def test_alerts_only_still_pushes_on_alerts(monkeypatch, capsys):
+    """--alerts-only:有告警照常推送。"""
+    def _alerting(asset, curr_date):
+        d = _healthy_quiet_dashboard(asset, curr_date)
+        d["fear_greed"] = {"value": 5, "classification": "Extreme Fear"}
+        return d
+    monkeypatch.setattr(run_intel, "build_dashboard", _alerting)
+    result = run_intel.run_intel(
+        asset="BTC", curr_date="2026-07-15",
+        config={"intel_push_sinks": ["stdout"]}, alerts_only=True,
+    )
+    assert result["skipped_no_alerts"] is False
+    assert len(result["alerts"]) >= 1
+    assert "盘面告警" in capsys.readouterr().out
+
+
+def test_alerts_only_still_pushes_on_data_errors(monkeypatch, capsys):
+    """--alerts-only:无告警但取数失败 → 白卷消息必须照常推出去,绝不静默。"""
+    def _broken(asset, curr_date):
+        d = _healthy_quiet_dashboard(asset, curr_date)
+        d["fear_greed"] = None
+        d["errors"] = {"fear_greed": "boom"}
+        return d
+    monkeypatch.setattr(run_intel, "build_dashboard", _broken)
+    result = run_intel.run_intel(
+        asset="BTC", curr_date="2026-07-15",
+        config={"intel_push_sinks": ["stdout"]}, alerts_only=True,
+    )
+    assert result["skipped_no_alerts"] is False
+    assert "fear_greed" in result["message"]
+    assert "盘面告警" in capsys.readouterr().out
