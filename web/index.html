@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>BTC Agent 决策仪表盘</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb; --page: #f9f9f7;
+    --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+    --grid: #e1e0d9; --baseline: #c3c2b7; --ring: rgba(11,11,11,0.10);
+    --s-blue: #2a78d6; --s-aqua: #1baf7a; --s-green: #008300;
+    --s-red: #e34948; --s-orange: #eb6834; --s-violet: #4a3aa7;
+    --good-text: #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+      --grid: #2c2c2a; --baseline: #383835; --ring: rgba(255,255,255,0.10);
+      --s-blue: #3987e5; --s-aqua: #199e70; --s-green: #008300;
+      --s-red: #e66767; --s-orange: #d95926; --s-violet: #9085e9;
+      --good-text: #0ca30c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink-1);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px; line-height: 1.55;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
+  header h1 { font-size: 20px; margin: 0 0 2px; }
+  header .sub { color: var(--ink-muted); font-size: 12px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 18px 0; }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .tile .k { color: var(--ink-muted); font-size: 12px; }
+  .tile .v { font-size: 20px; font-weight: 650; margin-top: 2px; }
+  .tile .v.small { font-size: 15px; }
+  .panel {
+    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 12px;
+    padding: 16px 16px 10px; margin: 14px 0;
+  }
+  .panel h2 { font-size: 14px; margin: 0 0 4px; }
+  .panel .note { color: var(--ink-muted); font-size: 12px; margin: 0 0 8px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ink-2); margin: 4px 0 6px; }
+  .legend .chip { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  svg text { font-family: inherit; }
+  .axis { font-size: 11px; fill: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--ink-muted); font-weight: 500; font-size: 12px;
+       border-bottom: 1px solid var(--grid); padding: 6px 8px; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  .tbl-wrap { overflow-x: auto; }
+  .empty { color: var(--ink-muted); padding: 18px 0; text-align: center; }
+  .pos { color: var(--good-text); } .neg { color: var(--s-red); }
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 10; display: none;
+    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.18);
+    font-variant-numeric: tabular-nums;
+  }
+  .tooltip .t-date { color: var(--ink-muted); margin-bottom: 2px; }
+  footer { color: var(--ink-muted); font-size: 11px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>BTC Agent 决策仪表盘</h1>
+    <div class="sub" id="meta">加载中…</div>
+  </header>
+
+  <div class="cards" id="tiles"></div>
+
+  <div class="panel">
+    <h2>收盘价与市场环境(近 <span id="win">90</span> 天)</h2>
+    <p class="note">背景色带 = 机械环境识别;灰带日为白卷(chaos / 数据不足)。</p>
+    <div class="legend" id="regime-legend"></div>
+    <div id="price-chart"><div class="empty">暂无数据</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>虚拟账户净值 vs BTC 持有</h2>
+    <p class="note" id="nav-note">机械仓位回放(无摩擦仿真近似,非模拟盘)。</p>
+    <div class="legend" id="nav-legend"></div>
+    <div id="nav-chart"><div class="empty">暂无数据</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>本月评级统计(<span id="stats-month">—</span>)</h2>
+    <div class="tbl-wrap" id="stats-block"><div class="empty">暂无数据</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>波段候选记录</h2>
+    <p class="note">全部价位为机械计算;被否决的候选同口径照常结算(反事实)。</p>
+    <div class="tbl-wrap" id="cand-block"><div class="empty">暂无候选</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>反事实对比:LLM 裁决 vs 机械全接受</h2>
+    <div class="tbl-wrap" id="cf-block"><div class="empty">暂无已结算候选</div></div>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+<div class="tooltip" id="tip"></div>
+
+<script>
+"use strict";
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const REGIME_LABEL = { trend_up:"趋势上涨", trend_down:"趋势下跌", range:"震荡",
+                       chaos:"高波动(白卷)", insufficient_data:"数据不足(白卷)" };
+const RATING_LABEL = { Buy:"买入", Overweight:"增持", Hold:"持有", Underweight:"减持", Sell:"卖出" };
+const VERDICT_LABEL = { accept:"接受", observe:"观察", veto:"否决" };
+const fmtMoney = v => v==null ? "—" : Math.round(v).toLocaleString("zh-CN");
+const fmtPct = v => v==null ? "—" : (v*100).toFixed(1) + "%";
+const fmtPrice = v => v==null ? "—" : Number(v).toLocaleString("zh-CN", {maximumFractionDigits:0});
+const pctClass = v => v==null ? "" : (v >= 0 ? "pos" : "neg");
+
+function regimeColor(r) {
+  return { trend_up: css("--s-green"), trend_down: css("--s-red"), range: css("--s-blue"),
+           chaos: css("--s-orange"), insufficient_data: css("--baseline") }[r] || css("--baseline");
+}
+
+const tip = document.getElementById("tip");
+function showTip(html, x, y) {
+  tip.innerHTML = html; tip.style.display = "block";
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(x + pad, innerWidth - w - 8) + "px";
+  tip.style.top = Math.max(8, Math.min(y + pad, innerHeight - h - 8)) + "px";
+}
+function hideTip() { tip.style.display = "none"; }
+
+/* 极简折线图:单/双序列 + 环境色带 + 十字线 tooltip。 */
+function lineChart(el, opts) {
+  const { series, bands, width } = opts;
+  const W = width || Math.min(el.clientWidth || 1000, 1040), H = 260;
+  const M = { l: 58, r: 12, t: 10, b: 24 };
+  const xs = series[0].points.map(p => p.x);
+  if (!xs.length) { el.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+  const allY = series.flatMap(s => s.points.map(p => p.y)).filter(v => v != null);
+  let y0 = Math.min(...allY), y1 = Math.max(...allY);
+  if (y0 === y1) { y0 -= 1; y1 += 1; }
+  const padY = (y1 - y0) * 0.08; y0 -= padY; y1 += padY;
+  const X = i => M.l + (xs.length === 1 ? 0.5 : i / (xs.length - 1)) * (W - M.l - M.r);
+  const Y = v => M.t + (1 - (v - y0) / (y1 - y0)) * (H - M.t - M.b);
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", "100%");
+  const add = (parent, tag, attrs, text) => {
+    const n = document.createElementNS(ns, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    parent.appendChild(n); return n;
+  };
+  // 环境色带(逐日背景)
+  if (bands) {
+    const half = xs.length === 1 ? (W - M.l - M.r) / 2 : (W - M.l - M.r) / (xs.length - 1) / 2;
+    bands.forEach((b, i) => {
+      if (!b) return;
+      add(svg, "rect", { x: X(i) - half, y: M.t, width: half * 2, height: H - M.t - M.b,
+                         fill: b, opacity: 0.13 });
+    });
+  }
+  // 网格与轴
+  for (let g = 0; g <= 3; g++) {
+    const v = y0 + (y1 - y0) * g / 3, y = Y(v);
+    add(svg, "line", { x1: M.l, x2: W - M.r, y1: y, y2: y, stroke: css("--grid"), "stroke-width": 1 });
+    add(svg, "text", { x: M.l - 6, y: y + 4, "text-anchor": "end", class: "axis" }, fmtPrice(v));
+  }
+  add(svg, "line", { x1: M.l, x2: W - M.r, y1: H - M.b, y2: H - M.b, stroke: css("--baseline") });
+  const tickEvery = Math.max(1, Math.ceil(xs.length / 6));
+  xs.forEach((d, i) => {
+    if (i % tickEvery !== 0 && i !== xs.length - 1) return;
+    add(svg, "text", { x: X(i), y: H - 7, "text-anchor": "middle", class: "axis" }, d.slice(5));
+  });
+  // 序列(2px 线;末点直接标注序列名)
+  series.forEach(s => {
+    const d = s.points.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p.y).toFixed(1)).join(" ");
+    add(svg, "path", { d, fill: "none", stroke: s.color, "stroke-width": 2,
+                       "stroke-linejoin": "round", "stroke-linecap": "round" });
+    const last = s.points[s.points.length - 1];
+    add(svg, "circle", { cx: X(s.points.length - 1), cy: Y(last.y), r: 3.5, fill: s.color,
+                         stroke: css("--surface-1"), "stroke-width": 2 });
+  });
+  // 十字线 + tooltip
+  const cross = add(svg, "line", { y1: M.t, y2: H - M.b, stroke: css("--baseline"),
+                                   "stroke-width": 1, "stroke-dasharray": "3 3", visibility: "hidden" });
+  svg.addEventListener("mousemove", ev => {
+    const r = svg.getBoundingClientRect();
+    const px = (ev.clientX - r.left) * (W / r.width);
+    let idx = Math.round((px - M.l) / ((W - M.l - M.r) / Math.max(1, xs.length - 1)));
+    idx = Math.max(0, Math.min(xs.length - 1, idx));
+    cross.setAttribute("x1", X(idx)); cross.setAttribute("x2", X(idx));
+    cross.setAttribute("visibility", "visible");
+    const rows = series.map(s =>
+      `<div><span class="sw" style="background:${s.color};display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px"></span>${s.name}: <b>${s.fmt(s.points[idx].y)}</b></div>`);
+    const extra = opts.tipExtra ? opts.tipExtra(idx) : "";
+    showTip(`<div class="t-date">${xs[idx]}</div>${rows.join("")}${extra}`, ev.clientX, ev.clientY);
+  });
+  svg.addEventListener("mouseleave", () => { cross.setAttribute("visibility", "hidden"); hideTip(); });
+  el.innerHTML = ""; el.appendChild(svg);
+}
+
+function legend(el, items) {
+  el.innerHTML = items.map(i =>
+    `<span class="chip"><span class="sw" style="background:${i.color}"></span>${i.label}</span>`).join("");
+}
+
+async function boot() {
+  let data;
+  try {
+    const res = await fetch("./data/dashboard.json", { cache: "no-store" });
+    data = await res.json();
+  } catch (e) {
+    document.getElementById("meta").textContent = "数据加载失败:" + e;
+    return;
+  }
+  const days = data.days || [];
+  document.getElementById("meta").textContent =
+    `${data.asset} · 数据生成于 ${data.generated_at_utc}(UTC) · 仅供研究,非投资建议`;
+  document.getElementById("win").textContent = data.window_days;
+  document.getElementById("foot").textContent =
+    "口径注记:净值为无摩擦仿真近似(收盘价+固定换仓摩擦假设),非模拟盘/实盘;候选结算 alpha 恒 0(基准=市场本身),候选组统计只看收益与命中率。";
+
+  // 顶部 tiles
+  const latest = data.latest;
+  const nav = data.nav || {};
+  const tiles = [];
+  if (latest) {
+    tiles.push({ k: "最新交易日(UTC)", v: latest.date, small: true });
+    tiles.push({ k: "市场环境", v: (REGIME_LABEL[latest.regime] || latest.regime || "—"), small: true });
+    tiles.push({ k: "评级", v: latest.blank_sheet ? "白卷" : (RATING_LABEL[latest.rating] || latest.rating || "—"), small: true });
+    tiles.push({ k: "收盘", v: fmtPrice(latest.close), small: false });
+  }
+  tiles.push({ k: "虚拟账户净值", v: fmtMoney(nav.final_nav), small: false });
+  tiles.push({ k: "累计收益", v: fmtPct(nav.total_return), small: false, cls: pctClass(nav.total_return) });
+  document.getElementById("tiles").innerHTML = tiles.map(t =>
+    `<div class="tile"><div class="k">${t.k}</div><div class="v ${t.small ? "small" : ""} ${t.cls || ""}">${t.v}</div></div>`).join("");
+
+  // 图1: 收盘价 + 环境色带
+  const priceDays = days.filter(d => d.close != null);
+  if (priceDays.length) {
+    legend(document.getElementById("regime-legend"),
+      ["trend_up", "trend_down", "range", "chaos", "insufficient_data"]
+        .map(r => ({ color: regimeColor(r), label: REGIME_LABEL[r] })));
+    lineChart(document.getElementById("price-chart"), {
+      series: [{ name: "收盘价", color: css("--s-blue"), fmt: fmtPrice,
+                 points: priceDays.map(d => ({ x: d.date, y: d.close })) }],
+      bands: priceDays.map(d => regimeColor(d.regime)),
+      tipExtra: i => {
+        const d = priceDays[i];
+        return `<div>环境: ${REGIME_LABEL[d.regime] || d.regime || "—"}` +
+               (d.blank_sheet ? "(白卷)" : "") + "</div>" +
+               `<div>评级: ${d.blank_sheet ? "—" : (RATING_LABEL[d.rating] || d.rating || "—")}</div>`;
+      },
+    });
+  }
+
+  // 图2: NAV vs HODL(HODL = 首日等额买入持有)
+  const curve = (nav.curve || []).filter(p => p.nav != null);
+  if (curve.length) {
+    const closeByDate = Object.fromEntries(priceDays.map(d => [d.date, d.close]));
+    const c0 = closeByDate[curve[0].date];
+    const hodl = curve.map(p => ({ x: p.date, y: c0 ? nav.capital * closeByDate[p.date] / c0 : null }))
+                      .filter(p => p.y != null);
+    const series = [{ name: "虚拟账户", color: css("--s-blue"), fmt: fmtMoney,
+                      points: curve.map(p => ({ x: p.date, y: p.nav })) }];
+    if (hodl.length === curve.length) {
+      series.push({ name: "BTC 持有", color: css("--s-aqua"), fmt: fmtMoney, points: hodl });
+    }
+    legend(document.getElementById("nav-legend"),
+      series.map(s => ({ color: s.color, label: s.name })));
+    document.getElementById("nav-note").textContent =
+      `本金 ${fmtMoney(nav.capital)} · 机械仓位回放 · 缺日 ${nav.missing_days} 天(顺延)· 无摩擦仿真近似,非模拟盘`;
+    lineChart(document.getElementById("nav-chart"), {
+      series,
+      tipExtra: i => `<div>仓位: ${(curve[i].position * 100).toFixed(0)}%` +
+                     ` · 评级: ${RATING_LABEL[curve[i].rating] || curve[i].rating || "—"}</div>`,
+    });
+  }
+
+  // 本月评级统计
+  document.getElementById("stats-month").textContent = data.rating_stats_month || "—";
+  const st = data.rating_stats;
+  if (st && st.overall && st.overall.count > 0) {
+    const rows = Object.entries(st.per_rating || {}).map(([r, v]) =>
+      `<tr><td>${RATING_LABEL[r] || r}</td><td>${v.count}</td><td>${v.hit_rate == null ? "—" : fmtPct(v.hit_rate)}</td>` +
+      `<td class="${pctClass(v.avg_strategy_return)}">${fmtPct(v.avg_strategy_return)}</td>` +
+      `<td class="${pctClass(v.avg_alpha)}">${fmtPct(v.avg_alpha)}</td></tr>`).join("");
+    document.getElementById("stats-block").innerHTML =
+      `<table><thead><tr><th>评级</th><th>次数</th><th>方向命中率</th><th>平均收益(现货口径)</th><th>平均 Alpha</th></tr></thead>` +
+      `<tbody>${rows}</tbody></table>` +
+      (st.pending ? `<p class="note">另有 ${st.pending} 条未到结算窗口(pending),未计入。</p>` : "");
+  } else if (st && st.pending) {
+    document.getElementById("stats-block").innerHTML =
+      `<div class="empty">本月暂无可统计条目;${st.pending} 条等待结算窗口。</div>`;
+  }
+
+  // 候选表
+  const cands = data.candidates || [];
+  if (cands.length) {
+    const rows = cands.map(c => {
+      const tz = c.target_zone ? (Array.isArray(c.target_zone) ? c.target_zone.map(fmtPrice).join("–") : fmtPrice(c.target_zone)) : "—";
+      const outcome = c.outcome ? `${c.outcome} @${fmtPrice(c.settle_price)} <span class="${pctClass(c.strategy_return)}">${fmtPct(c.strategy_return)}</span>` : "未结算";
+      return `<tr><td>${(c.created_at_utc || "").slice(0, 10)}</td><td>${c.candidate_type}</td>` +
+             `<td>${VERDICT_LABEL[c.verdict] || c.verdict || "—"}</td>` +
+             `<td>${fmtPrice(c.entry_ref)}</td><td>${fmtPrice(c.invalidation)}</td><td>${tz}</td>` +
+             `<td>${(c.expires_utc || "").slice(0, 10)}</td><td>${outcome}</td></tr>`;
+    }).join("");
+    document.getElementById("cand-block").innerHTML =
+      `<table><thead><tr><th>日期</th><th>类型</th><th>裁决</th><th>入场参考</th><th>失效位</th><th>目标区</th><th>有效期至</th><th>结算</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  // 反事实
+  const cf = data.counterfactual || [];
+  const cfRows = cf.filter(g => g.count > 0);
+  if (cfRows.length) {
+    document.getElementById("cf-block").innerHTML =
+      `<table><thead><tr><th>组</th><th>已结算笔数</th><th>平均收益</th><th>命中率</th></tr></thead><tbody>` +
+      cfRows.map(g =>
+        `<tr><td>${g.group === "accepted" ? "LLM 接受" : "LLM 否决/观察(反事实)"}</td><td>${g.count}</td>` +
+        `<td class="${pctClass(g.avg_strategy_return)}">${fmtPct(g.avg_strategy_return)}</td>` +
+        `<td>${g.hit_rate == null ? "—" : fmtPct(g.hit_rate)}</td></tr>`).join("") +
+      `</tbody></table>`;
+  }
+}
+boot();
+</script>
+</body>
+</html>
