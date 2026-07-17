@@ -216,11 +216,15 @@ def test_veto_candidate_is_settled_same_as_accepted_and_counterfactual_report(tm
     """反事实归因: veto 候选照常结算; counterfactual_report 输出 accepted vs vetoed 对比。"""
     conn = _db(tmp_path)
     _insert_candidate(conn, "BTC-accept", verdict="accept")
-    _insert_candidate(conn, "BTC-veto", verdict="veto")
-    provider = _provider_from({"2026-07-17": (95.0, 108.0, 106.0)})  # 两者同日触目标
+    _insert_candidate(conn, "BTC-veto", verdict="veto", creation_date="2026-07-17")
+    # 同 (asset, trade_date) 会被账本去重,两候选放相邻两日;各自次日触目标
+    provider = _provider_from({
+        "2026-07-17": (95.0, 108.0, 106.0),
+        "2026-07-18": (95.0, 108.0, 106.0),
+    })
 
     settled = settlement_mod.settle_due_candidates(
-        conn, ohlcv_provider=provider, as_of_utc="2026-07-17T00:00:00Z"
+        conn, ohlcv_provider=provider, as_of_utc="2026-07-18T00:00:00Z"
     )
     assert len(settled) == 2  # veto 候选照常结算,不因裁决被跳过
 

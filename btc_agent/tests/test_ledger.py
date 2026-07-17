@@ -173,3 +173,22 @@ def test_ledger_db_file_created_with_missing_parent_dir(tmp_path):
 
 if __name__ == "__main__":
     pytest.main([__file__, "-q"])
+
+
+def test_record_daily_same_trade_date_different_snapshot_id_is_idempotent(tmp_path):
+    """同 (asset, trade_date) 不同 snapshot_id(同日重跑)也必须去重——
+    snapshot_id 含运行时刻 hash,不能作为唯一幂等键(2026-07-17 生产事故回归)。"""
+    conn = ledger_mod.connect(str(tmp_path / "ledger.sqlite3"))
+    for run_hash in ("aaa", "bbb", "ccc"):
+        snapshot = _FakeSnapshot(
+            snapshot_id=f"BTC-2026-07-17-{run_hash}",
+            curr_date="2026-07-17",
+        )
+        rr = _FakeRegimeResult(observations={"last_close": 100.0})
+        ledger_mod.record_daily(
+            conn, snapshot, rr, "Hold",
+            "理由", {"entry": 100.0, "stop": None, "target": None, "atr": None}, None,
+        )
+    n_snap = conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
+    n_levels = conn.execute("SELECT COUNT(*) FROM trade_levels").fetchone()[0]
+    assert n_snap == 1 and n_levels == 1

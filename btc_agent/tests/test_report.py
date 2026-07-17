@@ -266,14 +266,15 @@ def test_rating_stats_empty_month_graceful(tmp_path):
 def test_candidate_group_report_accept_vs_veto(tmp_path):
     conn = _db(tmp_path)
     _seed_candidate(conn, "BTC-cand-accept", "2026-07-01", verdict="accept")
-    _seed_candidate(conn, "BTC-cand-veto", "2026-07-01", verdict="veto")
+    _seed_candidate(conn, "BTC-cand-veto", "2026-07-02", verdict="veto")
 
     provider = _ohlcv_provider_from(
         {
             "2026-07-02": (95.0, 108.0, 106.0),  # 触及目标下沿 105 → target
+            "2026-07-03": (95.0, 108.0, 106.0),  # 07-02 创建的候选次日触目标
         }
     )
-    settlement_mod.settle_due_candidates(conn, ohlcv_provider=provider, as_of_utc="2026-07-02T00:00:00Z")
+    settlement_mod.settle_due_candidates(conn, ohlcv_provider=provider, as_of_utc="2026-07-03T00:00:00Z")
 
     report = report_mod.candidate_group_report(conn)
     groups = {g["group"]: g for g in report}

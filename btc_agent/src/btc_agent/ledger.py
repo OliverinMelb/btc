@@ -242,6 +242,19 @@ def record_daily(
     if existing is not None:
         return  # 幂等: 同 snapshot_id 已入库,不重复插入。
 
+    # 同 (asset, trade_date) 也判重:snapshot_id 含运行时刻 hash,同日重跑会生成
+    # 新 id——但账本语义是"每交易日一条决策记录",当日首条为准,重跑直接返回。
+    # (2026-07-17 发现:同日手跑 3 次 daily 入了 3 行,统计重复计数。)
+    trade_date = getattr(snapshot, "curr_date", None)
+    asset = getattr(snapshot, "asset", None)
+    if trade_date and asset:
+        same_day = cur.execute(
+            "SELECT 1 FROM snapshots WHERE asset = ? AND trade_date = ?",
+            (asset, trade_date),
+        ).fetchone()
+        if same_day is not None:
+            return
+
     if strategy_version_id is None:
         strategy_version_id = default_strategy_version_id(conn)
 
