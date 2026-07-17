@@ -13,4 +13,15 @@ if errorlevel 1 (
   .venv\Scripts\python.exe -c "from btc_agent.intel.push import FeishuSink; FeishuSink().send('[ALERT] btc_agent daily FAILED (nonzero exit). Check %%USERPROFILE%%/.btc_agent/logs/scheduler/daily.log')" >> "%LOGDIR%\daily.log" 2>&1
   exit /b 1
 )
+
+rem Export dashboard data and push so Vercel redeploys. Failures here only warn;
+rem they never flip the daily exit code (card was already delivered).
+.venv\Scripts\python.exe -m btc_agent.webexport >> "%LOGDIR%\daily.log" 2>&1
+cd /d C:\Users\admin\Desktop\btc
+git add web/data/dashboard.json >> "%LOGDIR%\daily.log" 2>&1
+git commit -m "data: daily dashboard export" >> "%LOGDIR%\daily.log" 2>&1
+git push origin master >> "%LOGDIR%\daily.log" 2>&1
+if errorlevel 1 (
+  echo [WARN] dashboard export/push failed at %DATE% %TIME% >> "%LOGDIR%\daily.log"
+)
 exit /b 0

@@ -1,0 +1,138 @@
+{
+ "asset": "BTC",
+ "generated_at_utc": "2026-07-17T04:36:47Z",
+ "window_days": 90,
+ "days": [
+  {
+   "date": "2026-07-17",
+   "close": 63833.67,
+   "regime": "trend_up",
+   "blank_sheet": false,
+   "rating": "Hold"
+  },
+  {
+   "date": "2026-07-17",
+   "close": 63833.67,
+   "regime": "trend_up",
+   "blank_sheet": false,
+   "rating": "Hold"
+  },
+  {
+   "date": "2026-07-17",
+   "close": 63833.67,
+   "regime": "trend_up",
+   "blank_sheet": false,
+   "rating": "Hold"
+  }
+ ],
+ "latest": {
+  "date": "2026-07-17",
+  "close": 63833.67,
+  "regime": "trend_up",
+  "blank_sheet": false,
+  "rating": "Hold"
+ },
+ "nav": {
+  "curve": [
+   {
+    "date": "2026-07-17",
+    "nav": 1000000.0,
+    "position": 0.0,
+    "rating": "Hold"
+   },
+   {
+    "date": "2026-07-17",
+    "nav": 1000000.0,
+    "position": 0.0,
+    "rating": "Hold"
+   },
+   {
+    "date": "2026-07-17",
+    "nav": 1000000.0,
+    "position": 0.0,
+    "rating": "Hold"
+   }
+  ],
+  "final_nav": 1000000.0,
+  "total_return": 0.0,
+  "capital": 1000000,
+  "missing_days": 0
+ },
+ "report_params": {
+  "position_weights": {
+   "Buy": 1.0,
+   "Overweight": 0.5,
+   "Hold": "carry",
+   "Underweight": 0.25,
+   "Sell": 0.0
+  },
+  "friction_per_rebalance": 0.001,
+  "capital": 1000000,
+  "hit_horizon_days": 5
+ },
+ "rating_stats_month": "2026-07",
+ "rating_stats": {
+  "per_rating": {
+   "Buy": {
+    "count": 0,
+    "avg_market_return": null,
+    "avg_strategy_return": null,
+    "avg_alpha": null,
+    "hit_rate": null
+   },
+   "Overweight": {
+    "count": 0,
+    "avg_market_return": null,
+    "avg_strategy_return": null,
+    "avg_alpha": null,
+    "hit_rate": null
+   },
+   "Hold": {
+    "count": 0,
+    "avg_market_return": null,
+    "avg_strategy_return": null,
+    "avg_alpha": null,
+    "hit_rate": null
+   },
+   "Underweight": {
+    "count": 0,
+    "avg_market_return": null,
+    "avg_strategy_return": null,
+    "avg_alpha": null,
+    "hit_rate": null
+   },
+   "Sell": {
+    "count": 0,
+    "avg_market_return": null,
+    "avg_strategy_return": null,
+    "avg_alpha": null,
+    "hit_rate": null
+   }
+  },
+  "overall": {
+   "count": 0,
+   "avg_market_return": null,
+   "avg_strategy_return": null,
+   "avg_alpha": null,
+   "hit_rate": null
+  },
+  "pending": 3,
+  "no_close": 0,
+  "horizon_days": 5
+ },
+ "candidates": [],
+ "counterfactual": [
+  {
+   "group": "accepted",
+   "count": 0,
+   "avg_strategy_return": null,
+   "hit_rate": null
+  },
+  {
+   "group": "vetoed_or_observed",
+   "count": 0,
+   "avg_strategy_return": null,
+   "hit_rate": null
+  }
+ ]
+}

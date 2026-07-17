@@ -116,14 +116,20 @@ def _fetch_close_series(conn: sqlite3.Connection, asset: str) -> dict[str, float
     return closes
 
 
-def _fetch_ratings(conn: sqlite3.Connection, asset: str, month: str) -> list[tuple[str, str | None]]:
-    """当月 ``(trade_date, rating)`` 序列,按 trade_date 升序;白卷等无 trade_levels 行记 ``None``。"""
+def _fetch_ratings(
+    conn: sqlite3.Connection, asset: str, month: str | None
+) -> list[tuple[str, str | None]]:
+    """``(trade_date, rating)`` 序列,按 trade_date 升序;白卷等无 trade_levels 行记 ``None``。
+
+    ``month`` 为 None 时取全量(webexport 全窗口回放用),否则只取当月。
+    """
+    pattern = f"{month}-%" if month else "%"
     rows = conn.execute(
         "SELECT s.trade_date, tl.rating FROM snapshots s "
         "LEFT JOIN trade_levels tl ON tl.snapshot_id = s.snapshot_id "
         "WHERE s.asset = ? AND s.trade_date LIKE ? "
         "ORDER BY s.trade_date",
-        (asset, f"{month}-%"),
+        (asset, pattern),
     ).fetchall()
     return [(trade_date, rating) for trade_date, rating in rows]
 
@@ -226,23 +232,23 @@ def _count_missing_days(sorted_dates: list[str]) -> int:
     return total_span - len(have)
 
 
-def nav_replay(
-    conn: sqlite3.Connection,
-    month: str,
-    asset: str = "BTC",
+def replay_dates(
+    closes: dict[str, float],
+    ratings: dict[str, str | None],
+    dates: list[str],
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """月度虚拟账户净值回放(见模块 docstring 第 3 段口径)。"""
+    """在给定日期序列上做虚拟账户净值回放(口径见模块 docstring 第 3 段)。
+
+    ``nav_replay``(月度)与 webexport(全窗口)共用本函数——回放公式只此一份,
+    与结算口径同理:不许在别处再写第二遍。``dates`` 必须升序且都在 ``closes`` 里。
+    """
     p = dict(params) if params is not None else REPORT_PARAMS
     weights = p["position_weights"]
     friction = p["friction_per_rebalance"]
     capital = p["capital"]
 
-    closes = _fetch_close_series(conn, asset)
-    ratings = dict(_fetch_ratings(conn, asset, month))
-    month_dates = sorted(d for d in closes if d.startswith(f"{month}-"))
-
-    if not month_dates:
+    if not dates:
         return {
             "curve": [],
             "final_nav": capital,
@@ -252,13 +258,13 @@ def nav_replay(
             "params": p,
         }
 
-    missing_days = _count_missing_days(month_dates)
+    missing_days = _count_missing_days(dates)
 
     nav = float(capital)
     curve: list[dict[str, Any]] = []
     prev_position = 0.0
     prev_close: float | None = None
-    for d in month_dates:
+    for d in dates:
         rating = ratings.get(d)
         position = _resolve_position(rating, prev_position, weights)
         turnover = abs(position - prev_position)
@@ -280,6 +286,19 @@ def nav_replay(
         "capital": capital,
         "params": p,
     }
+
+
+def nav_replay(
+    conn: sqlite3.Connection,
+    month: str,
+    asset: str = "BTC",
+    params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """月度虚拟账户净值回放(见模块 docstring 第 3 段口径)。"""
+    closes = _fetch_close_series(conn, asset)
+    ratings = dict(_fetch_ratings(conn, asset, month))
+    month_dates = sorted(d for d in closes if d.startswith(f"{month}-"))
+    return replay_dates(closes, ratings, month_dates, params)
 
 
 def _fmt_money(value: float) -> str:
