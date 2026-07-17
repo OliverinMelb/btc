@@ -110,7 +110,9 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "checkpoint_enabled": False,
     # Output language for analyst reports and final decision
     # Internal agent debate stays in English for reasoning quality
-    "output_language": "English",
+    # BTC agent: 面向中文用户,所有 LLM 输出(辩论/评级理由/裁决)统一中文
+    # (v0 改装清单第 1 条,曾漏配导致决策卡中英混杂)。
+    "output_language": "Chinese",
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,

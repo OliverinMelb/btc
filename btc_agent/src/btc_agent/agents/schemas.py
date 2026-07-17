@@ -182,17 +182,16 @@ class PortfolioDecision(BaseModel):
 def render_pm_decision(decision: PortfolioDecision) -> str:
     """Render a PortfolioDecision back to the markdown shape the rest of the system expects.
 
-    Memory log, CLI display, and saved report files all read this markdown,
-    so the rendered output preserves the exact section headers (``**Rating**``,
-    ``**Executive Summary**``, ``**Investment Thesis**``) that downstream
-    parsers and the report writers already handle.
+    ``**Rating**:`` 是 ``extract_rating`` 的解析锚点,**必须保持英文原样**;
+    评级值(Buy/Hold/Sell...)同理。另外两个小节标题仅供人读(决策卡/报告),
+    无下游解析器消费(2026-07-17 grep 验证),故用中文,与全中文决策卡一致。
     """
     parts = [
         f"**Rating**: {decision.rating.value}",
         "",
-        f"**Executive Summary**: {decision.executive_summary}",
+        f"**决策摘要**: {decision.executive_summary}",
         "",
-        f"**Investment Thesis**: {decision.investment_thesis}",
+        f"**投资论点**: {decision.investment_thesis}",
     ]
     return "\n".join(parts)
 
