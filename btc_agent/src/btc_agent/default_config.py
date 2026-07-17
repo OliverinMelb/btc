@@ -168,7 +168,7 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # email 需 SMTP_USER + SMTP_PASSWORD(QQ 邮箱填授权码) + EMAIL_TO(默认 smtp.qq.com:465);
     # feishu 需 FEISHU_WEBHOOK_URL(+ 可选 FEISHU_WEBHOOK_SECRET);telegram 需
     # TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID。凭据缺失的渠道自动降级跳过(不阻断其它)。
-    "intel_push_sinks": ["stdout", "email"],
+    "intel_push_sinks": ["stdout", "feishu"],
     # Benchmark for alpha calculation in the reflection layer.
     # ``benchmark_ticker`` (when set) overrides the suffix map for all
     # tickers; leave it None to use ``benchmark_map`` for auto-detection
