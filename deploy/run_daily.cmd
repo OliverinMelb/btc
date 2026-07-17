@@ -24,4 +24,9 @@ git push origin master >> "%LOGDIR%\daily.log" 2>&1
 if errorlevel 1 (
   echo [WARN] dashboard export/push failed at %DATE% %TIME% >> "%LOGDIR%\daily.log"
 )
+rem Vercel CLI production deploy of web/ (GitHub auto-deploy integration not connected).
+call "%APPDATA%\npm\vercel.cmd" deploy --prod --yes --cwd C:\Users\admin\Desktop\btc\web >> "%LOGDIR%\daily.log" 2>&1
+if errorlevel 1 (
+  echo [WARN] vercel deploy failed at %DATE% %TIME% >> "%LOGDIR%\daily.log"
+)
 exit /b 0
