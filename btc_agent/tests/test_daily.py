@@ -384,6 +384,24 @@ def test_ledger_recorder_full_pipeline_records_all_tables(tmp_path, monkeypatch)
     assert conn.execute("SELECT COUNT(*) FROM trade_levels").fetchone()[0] == 1
 
 
+def test_build_default_ledger_recorder_returns_none_when_ledger_disabled():
+    """contract-backfill 子任务 F3: ``ledger_enabled=False`` → CLI 默认账本接线
+    直接返回 None(不接线,等价于旧行为),且不 import ledger/settlement 模块。"""
+    cfg = {"ledger_enabled": False}
+    recorder = daily_mod._build_default_ledger_recorder(cfg)
+    assert recorder is None
+
+
+def test_build_default_ledger_recorder_wires_up_when_enabled(tmp_path):
+    """对照组: ``ledger_enabled=True``(或缺省)→ 返回可调用的 recorder。"""
+    cfg = {
+        "ledger_enabled": True,
+        "ledger_db_path": str(tmp_path / "ledger.sqlite3"),
+    }
+    recorder = daily_mod._build_default_ledger_recorder(cfg)
+    assert callable(recorder)
+
+
 def test_daily_module_source_contains_mechanical_levels_and_blank_sheet_keywords():
     """契约延伸(ST7 会指到这里): daily.py 源码须含 compute_trade_levels 调用与白卷语义关键字。"""
     src = inspect.getsource(daily_mod)

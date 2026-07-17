@@ -68,7 +68,15 @@
             "btc_agent/src/btc_agent/dataflows/interface.py",
             "btc_agent/src/btc_agent/agents/schemas.py",
             "btc_agent/src/btc_agent/run.py",
-            "btc_agent/src/btc_agent/intel/"
+            "btc_agent/src/btc_agent/intel/",
+            "btc_agent/src/btc_agent/evidence.py",
+            "btc_agent/src/btc_agent/regime.py",
+            "btc_agent/src/btc_agent/candidates.py",
+            "btc_agent/src/btc_agent/ledger.py",
+            "btc_agent/src/btc_agent/settlement.py",
+            "btc_agent/src/btc_agent/decision_card.py",
+            "btc_agent/src/btc_agent/daily.py",
+            "btc_agent/src/btc_agent/settlement_math.py"
         ],
         "structural_checks": [
             {
@@ -85,9 +93,10 @@
                 "must_contain": [
                     "class ResearchPlan",
                     "class TraderProposal",
-                    "class PortfolioDecision"
+                    "class PortfolioDecision",
+                    "class CandidateVerdict"
                 ],
-                "error": "结构化输出 schema 契约破损: 缺 ResearchPlan/TraderProposal/PortfolioDecision"
+                "error": "结构化输出 schema 契约破损: 缺 ResearchPlan/TraderProposal/PortfolioDecision/CandidateVerdict"
             },
             {
                 "file": "btc_agent/src/btc_agent/run.py",
@@ -103,6 +112,39 @@
                     "def evaluate"
                 ],
                 "error": "情报层规则引擎契约破损: evaluate 入口缺失"
+            },
+            {
+                "file": "btc_agent/src/btc_agent/daily.py",
+                "must_contain": [
+                    "compute_trade_levels",
+                    "blank_sheet"
+                ],
+                "error": "v2 每日编排契约破损: 机械价位不变式(compute_trade_levels)或白卷开关(blank_sheet)被移除"
+            },
+            {
+                "file": "btc_agent/src/btc_agent/settlement_math.py",
+                "must_contain": [
+                    "def spot_settle",
+                    "\"spot\""
+                ],
+                "error": "现货结算口径契约破损: spot_settle 入口或 settlement_basis=\"spot\" 字面量被移除"
+            },
+            {
+                "file": "btc_agent/src/btc_agent/ledger.py",
+                "must_contain": [
+                    "旧版本行及其结算数据只读",
+                    "get_or_create_strategy_version",
+                    "params_hash"
+                ],
+                "error": "账本版本只读契约破损: 策略版本只读不变式说明或 get_or_create_strategy_version/params_hash 被移除"
+            },
+            {
+                "file": "btc_agent/src/btc_agent/candidates.py",
+                "must_contain": [
+                    "CANDIDATE_PARAMS",
+                    "from btc_agent.agents.schemas import CandidateVerdict"
+                ],
+                "error": "候选引擎契约破损: 策略版本参数字典 CANDIDATE_PARAMS 或对 CandidateVerdict 的消费点被移除"
             }
         ]
     },
@@ -114,6 +156,12 @@
                 "file": "btc_agent/src/btc_agent/run.py",
                 "must_contain": "DEEPSEEK_API_KEY",
                 "error": "run.py 丢失 DEEPSEEK_API_KEY 环境变量校验"
+            },
+            {
+                "$comment": "v2 daily 编排入口(python -m btc_agent.daily)同样必须校验 DEEPSEEK_API_KEY，不许绕开 run.py 单独一套校验语义。",
+                "file": "btc_agent/src/btc_agent/daily.py",
+                "must_contain": "DEEPSEEK_API_KEY",
+                "error": "daily.py 丢失 DEEPSEEK_API_KEY 环境变量校验"
             }
         ]
     }
