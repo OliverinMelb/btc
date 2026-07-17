@@ -1,5 +1,19 @@
 # v1 起步待办（清空上下文后从这里接）
 
+## ✅ v2 决策卡+账本 —— 已完成(2026-07-17)
+
+任务包 `workflow/tasks/20260716-173324-v2-decision-card/`(设计门两轮 + 7 子任务全独立复验)。
+交付:统一证据快照(evidence.py)→ 机械环境五分类(regime.py,chaos/数据不足白卷)→
+每日决策卡(decision_card.py + `python -m btc_agent.daily`)→ 震荡下沿候选(candidates.py)
+→ CandidateVerdict 裁决(零数字)→ SQLite 账本+事件驱动结算+反事实(ledger/settlement.py)
+→ 策略版本状态机(改参数即新版本)。现货口径修正(Sell 不再按做空记账,direction_hit 分离)。
+真数据端到端已过:双模型 deepseek-v4-pro/flash(link3.top),环境 trend_up,评级 Hold,
+账本落库 `~/.btc_agent/logs/ledger.sqlite3`。
+
+**部署侧待办(v1"稳定推送"与 v2 共用)**:SMTP/飞书凭据进 `btc_agent/.env` →
+挂 Windows 计划任务每日跑 `python -m btc_agent.daily`(cwd 必须 btc_agent/)→
+监控非零退出码。backlog v2.5:graph ToolNode 取数并入快照;prompt 中文化打磨。
+
 ## ✅ 可靠性加固（2026-07-16）
 
 - 情报取数失败会随所有 sink 明示为“数据不完整/白卷”，不再把未知误报为“无异常”；

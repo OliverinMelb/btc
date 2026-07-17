@@ -28,6 +28,53 @@
           "workflow": "agent-change"
         }
       ]
+    },
+    {
+      "task_id": "20260716-173324-v2-decision-card",
+      "subtasks": [
+        {
+          "subtask_id": "spot-settlement",
+          "branch": "subtask/spot-settlement",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-spot-settlement",
+          "workflow": "agent-change"
+        },
+        {
+          "subtask_id": "evidence-snapshot",
+          "branch": "subtask/evidence-snapshot",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-evidence-snapshot",
+          "workflow": "agent-change"
+        },
+        {
+          "subtask_id": "regime-detector",
+          "branch": "subtask/regime-detector",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-regime-detector",
+          "workflow": "agent-change"
+        },
+        {
+          "subtask_id": "decision-card",
+          "branch": "subtask/decision-card",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-decision-card",
+          "workflow": "agent-change"
+        },
+        {
+          "subtask_id": "swing-candidate",
+          "branch": "subtask/swing-candidate",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-swing-candidate",
+          "workflow": "agent-change"
+        },
+        {
+          "subtask_id": "sqlite-ledger",
+          "branch": "subtask/sqlite-ledger",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-sqlite-ledger",
+          "workflow": "agent-change"
+        },
+        {
+          "subtask_id": "contract-backfill",
+          "branch": "subtask/contract-backfill",
+          "worktree_path": "C:\\Users\\admin\\Desktop\\wt-contract-backfill",
+          "workflow": "agent-change"
+        }
+      ]
     }
   ]
 }
