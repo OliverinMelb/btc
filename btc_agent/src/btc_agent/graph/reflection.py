@@ -34,6 +34,7 @@ class Reflector:
         raw_return: float,
         alpha_return: float,
         benchmark_name: str = "BTC-HODL",
+        direction_hit: bool | None = None,
     ) -> str:
         """Single reflection call on the final trade decision with outcome context.
 
@@ -42,14 +43,26 @@ class Reflector:
         ``benchmark_name`` is the label used for the alpha line (e.g. ``"SPY"``
         for US tickers, ``"^N225"`` for ``.T`` listings); defaults to SPY for
         callers that haven't been updated to thread the benchmark through.
+
+        ``direction_hit`` is passed explicitly (rather than left to be inferred
+        from ``raw_return``/``alpha_return``) because under spot-only settlement
+        a correct bearish (Sell) call settles to a raw_return of 0 — the
+        reflection needs the direction call surfaced directly instead of
+        reverse-engineering it from a return figure that's zero either way.
+        ``None`` means no directional call was made (flat/Hold) and is omitted
+        from the prompt.
         """
+        direction_line = ""
+        if direction_hit is not None:
+            direction_line = f"Direction call: {'correct' if direction_hit else 'incorrect'}\n"
         messages = [
             ("system", self.log_reflection_prompt),
             (
                 "human",
                 (
                     f"Raw return: {raw_return:+.1%}\n"
-                    f"Alpha vs {benchmark_name}: {alpha_return:+.1%}\n\n"
+                    f"Alpha vs {benchmark_name}: {alpha_return:+.1%}\n"
+                    f"{direction_line}\n"
                     f"Final Decision:\n{final_decision}"
                 ),
             ),

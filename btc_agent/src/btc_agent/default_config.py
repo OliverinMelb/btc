@@ -179,6 +179,12 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # 供结算取价，benchmark_label 是复盘里 "Alpha vs ..." 的人读标签。
     "benchmark_ticker": "BTC/USDT",
     "benchmark_label": "BTC-HODL",
+    # v2 ST6: SQLite 账本接线开关(仅 CLI 入口 btc_agent.daily.main 读取,见
+    # _build_default_ledger_recorder)。True(默认)= 每日快照/候选/裁决/价位入库 +
+    # 顺带触发到期结算;False = 完全不接线(不 import ledger/settlement 模块,等价
+    # 于账本功能不存在)。库函数 run_daily() 本身的 ledger_recorder 参数默认仍是
+    # None,不受此键影响——这个开关只管 CLI 默认行为。
+    "ledger_enabled": True,
     "benchmark_map": {
         ".NS":  "^NSEI",       # NSE India (Nifty 50)
         ".BO":  "^BSESN",      # BSE India (Sensex)
