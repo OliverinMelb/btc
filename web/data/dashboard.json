@@ -1,6 +1,6 @@
 {
  "asset": "BTC",
- "generated_at_utc": "2026-07-21T01:58:56Z",
+ "generated_at_utc": "2026-07-22T02:07:43Z",
  "window_days": 90,
  "days": [
   {
@@ -23,11 +23,18 @@
    "regime": "trend_up",
    "blank_sheet": false,
    "rating": "Hold"
+  },
+  {
+   "date": "2026-07-22",
+   "close": 66559.92,
+   "regime": "trend_up",
+   "blank_sheet": false,
+   "rating": "Hold"
   }
  ],
  "latest": {
-  "date": "2026-07-21",
-  "close": 65261.05,
+  "date": "2026-07-22",
+  "close": 66559.92,
   "regime": "trend_up",
   "blank_sheet": false,
   "rating": "Hold"
@@ -48,6 +55,12 @@
    },
    {
     "date": "2026-07-21",
+    "nav": 1000000.0,
+    "position": 0.0,
+    "rating": "Hold"
+   },
+   {
+    "date": "2026-07-22",
     "nav": 1000000.0,
     "position": 0.0,
     "rating": "Hold"
@@ -88,10 +101,10 @@
     "hit_rate": null
    },
    "Hold": {
-    "count": 0,
-    "avg_market_return": null,
-    "avg_strategy_return": null,
-    "avg_alpha": null,
+    "count": 1,
+    "avg_market_return": 0.04270865203269685,
+    "avg_strategy_return": 0.0,
+    "avg_alpha": -0.04270865203269685,
     "hit_rate": null
    },
    "Underweight": {
@@ -110,10 +123,10 @@
    }
   },
   "overall": {
-   "count": 0,
-   "avg_market_return": null,
-   "avg_strategy_return": null,
-   "avg_alpha": null,
+   "count": 1,
+   "avg_market_return": 0.04270865203269685,
+   "avg_strategy_return": 0.0,
+   "avg_alpha": -0.04270865203269685,
    "hit_rate": null
   },
   "pending": 3,
