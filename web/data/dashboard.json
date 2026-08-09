@@ -1,6 +1,6 @@
 {
  "asset": "BTC",
- "generated_at_utc": "2026-07-31T02:33:33Z",
+ "generated_at_utc": "2026-08-09T06:53:23Z",
  "window_days": 90,
  "days": [
   {
@@ -72,12 +72,54 @@
    "regime": "trend_up",
    "blank_sheet": false,
    "rating": "Hold"
+  },
+  {
+   "date": "2026-08-01",
+   "close": 62868.96,
+   "regime": "range",
+   "blank_sheet": false,
+   "rating": "Hold"
+  },
+  {
+   "date": "2026-08-03",
+   "close": null,
+   "regime": "insufficient_data",
+   "blank_sheet": true,
+   "rating": null
+  },
+  {
+   "date": "2026-08-04",
+   "close": null,
+   "regime": "insufficient_data",
+   "blank_sheet": true,
+   "rating": null
+  },
+  {
+   "date": "2026-08-05",
+   "close": null,
+   "regime": "insufficient_data",
+   "blank_sheet": true,
+   "rating": null
+  },
+  {
+   "date": "2026-08-06",
+   "close": null,
+   "regime": "insufficient_data",
+   "blank_sheet": true,
+   "rating": null
+  },
+  {
+   "date": "2026-08-08",
+   "close": 64915.74,
+   "regime": "range",
+   "blank_sheet": false,
+   "rating": "Hold"
   }
  ],
  "latest": {
-  "date": "2026-07-31",
-  "close": 64786.73,
-  "regime": "trend_up",
+  "date": "2026-08-08",
+  "close": 64915.74,
+  "regime": "range",
   "blank_sheet": false,
   "rating": "Hold"
  },
@@ -124,12 +166,24 @@
     "nav": 1000000.0,
     "position": 0.0,
     "rating": "Hold"
+   },
+   {
+    "date": "2026-08-01",
+    "nav": 1000000.0,
+    "position": 0.0,
+    "rating": "Hold"
+   },
+   {
+    "date": "2026-08-08",
+    "nav": 1000000.0,
+    "position": 0.0,
+    "rating": "Hold"
    }
   ],
   "final_nav": 1000000.0,
   "total_return": 0.0,
   "capital": 1000000,
-  "missing_days": 8
+  "missing_days": 14
  },
  "report_params": {
   "position_weights": {
@@ -143,7 +197,7 @@
   "capital": 1000000,
   "hit_horizon_days": 5
  },
- "rating_stats_month": "2026-07",
+ "rating_stats_month": "2026-08",
  "rating_stats": {
   "per_rating": {
    "Buy": {
@@ -161,10 +215,10 @@
     "hit_rate": null
    },
    "Hold": {
-    "count": 1,
-    "avg_market_return": 0.04270865203269685,
-    "avg_strategy_return": 0.0,
-    "avg_alpha": -0.04270865203269685,
+    "count": 0,
+    "avg_market_return": null,
+    "avg_strategy_return": null,
+    "avg_alpha": null,
     "hit_rate": null
    },
    "Underweight": {
@@ -183,17 +237,37 @@
    }
   },
   "overall": {
-   "count": 1,
-   "avg_market_return": 0.04270865203269685,
-   "avg_strategy_return": 0.0,
-   "avg_alpha": -0.04270865203269685,
+   "count": 0,
+   "avg_market_return": null,
+   "avg_strategy_return": null,
+   "avg_alpha": null,
    "hit_rate": null
   },
-  "pending": 6,
+  "pending": 2,
   "no_close": 0,
   "horizon_days": 5
  },
- "candidates": [],
+ "candidates": [
+  {
+   "id": 1,
+   "candidate_type": "range_lower_long",
+   "entry_ref": 62868.96,
+   "invalidation": 60275.43,
+   "target_zone": [
+    64389.33,
+    66959.24
+   ],
+   "expires_utc": "2026-08-06T00:00:00Z",
+   "created_at_utc": "2026-08-02T15:08:14Z",
+   "verdict": "observe",
+   "reason": "LLM 调用失败,白卷降级: Error code: 401 - {'error': {'message': 'Authentication Fails, Your api key: ****IQSQ is invalid', 'type': 'authentication_error', 'param': None, 'code': 'invalid_request_error'}}",
+   "outcome": "target",
+   "settle_price": 64389.33,
+   "strategy_return": 0.024183158111729584,
+   "direction_hit": true,
+   "settled_at_utc": "2026-08-09T06:52:48Z"
+  }
+ ],
  "counterfactual": [
   {
    "group": "accepted",
@@ -203,9 +277,9 @@
   },
   {
    "group": "vetoed_or_observed",
-   "count": 0,
-   "avg_strategy_return": null,
-   "hit_rate": null
+   "count": 1,
+   "avg_strategy_return": 0.024183158111729584,
+   "hit_rate": 1.0
   }
  ]
 }
