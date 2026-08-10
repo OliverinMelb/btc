@@ -1,6 +1,6 @@
 {
  "asset": "BTC",
- "generated_at_utc": "2026-08-09T06:53:23Z",
+ "generated_at_utc": "2026-08-10T02:19:58Z",
  "window_days": 90,
  "days": [
   {
@@ -114,12 +114,19 @@
    "regime": "range",
    "blank_sheet": false,
    "rating": "Hold"
+  },
+  {
+   "date": "2026-08-10",
+   "close": 64894.15,
+   "regime": "trend_up",
+   "blank_sheet": false,
+   "rating": "Hold"
   }
  ],
  "latest": {
-  "date": "2026-08-08",
-  "close": 64915.74,
-  "regime": "range",
+  "date": "2026-08-10",
+  "close": 64894.15,
+  "regime": "trend_up",
   "blank_sheet": false,
   "rating": "Hold"
  },
@@ -178,12 +185,18 @@
     "nav": 1000000.0,
     "position": 0.0,
     "rating": "Hold"
+   },
+   {
+    "date": "2026-08-10",
+    "nav": 1000000.0,
+    "position": 0.0,
+    "rating": "Hold"
    }
   ],
   "final_nav": 1000000.0,
   "total_return": 0.0,
   "capital": 1000000,
-  "missing_days": 14
+  "missing_days": 15
  },
  "report_params": {
   "position_weights": {
@@ -243,7 +256,7 @@
    "avg_alpha": null,
    "hit_rate": null
   },
-  "pending": 2,
+  "pending": 3,
   "no_close": 0,
   "horizon_days": 5
  },
