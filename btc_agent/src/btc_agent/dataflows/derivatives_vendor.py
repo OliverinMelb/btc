@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 
 import ccxt
 
+from .ccxt_proxy import call_with_proxy_failover
 from .config import get_config
 from .errors import NoMarketDataError
 
@@ -33,25 +34,31 @@ def _perp_symbol(symbol: str) -> str:
     return f"{base}/{DEFAULT_QUOTE}:{DEFAULT_QUOTE}"
 
 
-def _derivatives_exchange():
-    """按 config 构造带代理的 ccxt 永续交易所实例(默认 binance)。"""
+def _derivatives_exchange(exchange_id: str):
+    """构造 ccxt 永续交易所实例；代理由公共 failover 层逐次注入。"""
+    return getattr(ccxt, exchange_id)(
+        {"enableRateLimit": True, "options": {"defaultType": "swap"}}
+    )
+
+
+def _derivatives_request(request):
     cfg = get_config()
     exchange_id = cfg.get("ccxt_derivatives_exchange") or DEFAULT_DERIVATIVES_EXCHANGE
-    proxy = cfg.get("ccxt_proxy")
-    exchange = getattr(ccxt, exchange_id)({"enableRateLimit": True, "options": {"defaultType": "swap"}})
-    if proxy:
-        exchange.httpsProxy = proxy
-    return exchange
+    return call_with_proxy_failover(
+        cfg,
+        lambda: _derivatives_exchange(exchange_id),
+        request,
+    )
 
 
 def _fetch_funding_raw(pair: str) -> dict:
     """拉资金费率原始结构。网络出口之一(测试 patch 此函数)。"""
-    return _derivatives_exchange().fetch_funding_rate(pair)
+    return _derivatives_request(lambda exchange: exchange.fetch_funding_rate(pair))
 
 
 def _fetch_open_interest_raw(pair: str) -> dict:
     """拉未平仓合约原始结构。网络出口之一(测试 patch 此函数)。"""
-    return _derivatives_exchange().fetch_open_interest(pair)
+    return _derivatives_request(lambda exchange: exchange.fetch_open_interest(pair))
 
 
 def get_derivatives_snapshot_data(symbol: str, curr_date: str | None = None) -> dict:

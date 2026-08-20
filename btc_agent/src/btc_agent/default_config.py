@@ -19,6 +19,8 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_BENCHMARK_TICKER":     "benchmark_ticker",
     "TRADINGAGENTS_TEMPERATURE":          "temperature",
     "TRADINGAGENTS_LLM_MAX_RETRIES":      "llm_max_retries",
+    "TRADINGAGENTS_CCXT_PROXY":            "ccxt_proxy",
+    "TRADINGAGENTS_CCXT_PROXY_FALLBACKS":  "ccxt_proxy_fallbacks",
     # Provider-specific reasoning/thinking knobs (None = each provider's own
     # default). Settable here for non-interactive runs; the CLI also offers an
     # interactive choice, which is skipped when the matching var is set.
@@ -39,6 +41,8 @@ def _coerce(value: str, reference):
     default — a misspelled boolean (e.g. ``treu``) or non-numeric int should fail
     loudly at startup, not quietly misconfigure an unattended run.
     """
+    if isinstance(reference, list):
+        return [item.strip() for item in value.split(",") if item.strip()]
     if isinstance(reference, bool):
         normalized = value.strip().lower()
         if normalized in _BOOL_TRUE:
@@ -139,9 +143,11 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
     # ccxt vendor 设置(BTC agent v0)。本机 binance 主站被地域封锁(451)且直连交易所
     # 普遍不可达，故默认用 binance.us + 本地 Clash 代理(实测 kraken/binance.us 经该代理可达)。
-    # 换机器/网络时按需改这两项。
+    # 网络异常时按顺序切换后备代理；换机器/网络可用 TRADINGAGENTS_CCXT_PROXY
+    # 和 TRADINGAGENTS_CCXT_PROXY_FALLBACKS（逗号分隔）覆盖，无需改代码。
     "ccxt_exchange": "binanceus",
-    "ccxt_proxy": "http://127.0.0.1:7890",
+    "ccxt_proxy": "http://127.0.0.1:6696",
+    "ccxt_proxy_fallbacks": ["http://127.0.0.1:7890"],
     # 永续盘面(资金费率/OI)单独取所:现货默认所 binance.us 无永续合约。
     # binance/bybit 本机被地域封锁(451/403);实测 okx/gate 经 ccxt_proxy 可达,默认 okx。
     # 换机器/网络时按需改。

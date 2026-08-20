@@ -17,6 +17,7 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 from stockstats import wrap
 
+from .ccxt_proxy import call_with_proxy_failover
 from .config import get_config
 from .symbol_utils import NoMarketDataError
 
@@ -60,12 +61,15 @@ def _fetch_ohlcv_raw(pair: str, timeframe: str = "1d", limit: int = 400) -> list
     """
     cfg = get_config()
     exchange_id = cfg.get("ccxt_exchange") or DEFAULT_EXCHANGE
-    proxy = cfg.get("ccxt_proxy")
-    exchange = getattr(ccxt, exchange_id)({"enableRateLimit": True})
-    if proxy:
-        # ccxt 统一代理属性，优先于环境变量里的远程 VPN 代理(其对交易所常 RESET)。
-        exchange.httpsProxy = proxy
-    return exchange.fetch_ohlcv(pair, timeframe=timeframe, limit=limit)
+    return call_with_proxy_failover(
+        cfg,
+        lambda: getattr(ccxt, exchange_id)({"enableRateLimit": True}),
+        lambda exchange: exchange.fetch_ohlcv(
+            pair,
+            timeframe=timeframe,
+            limit=limit,
+        ),
+    )
 
 
 def _ohlcv_dataframe(symbol: str, curr_date: str | None = None) -> pd.DataFrame:
