@@ -1,6 +1,6 @@
 {
  "asset": "BTC",
- "generated_at_utc": "2026-08-14T02:04:40Z",
+ "generated_at_utc": "2026-09-01T04:30:33Z",
  "window_days": 90,
  "days": [
   {
@@ -142,14 +142,56 @@
    "regime": "trend_down",
    "blank_sheet": false,
    "rating": "Hold"
+  },
+  {
+   "date": "2026-08-17",
+   "close": null,
+   "regime": "insufficient_data",
+   "blank_sheet": true,
+   "rating": null
+  },
+  {
+   "date": "2026-08-20",
+   "close": null,
+   "regime": "insufficient_data",
+   "blank_sheet": true,
+   "rating": null
+  },
+  {
+   "date": "2026-08-25",
+   "close": null,
+   "regime": "insufficient_data",
+   "blank_sheet": true,
+   "rating": null
+  },
+  {
+   "date": "2026-08-26",
+   "close": null,
+   "regime": "insufficient_data",
+   "blank_sheet": true,
+   "rating": null
+  },
+  {
+   "date": "2026-08-28",
+   "close": null,
+   "regime": "insufficient_data",
+   "blank_sheet": true,
+   "rating": null
+  },
+  {
+   "date": "2026-09-01",
+   "close": 78570.75,
+   "regime": "chaos",
+   "blank_sheet": true,
+   "rating": null
   }
  ],
  "latest": {
-  "date": "2026-08-14",
-  "close": 63484.39,
-  "regime": "trend_down",
-  "blank_sheet": false,
-  "rating": "Hold"
+  "date": "2026-09-01",
+  "close": 78570.75,
+  "regime": "chaos",
+  "blank_sheet": true,
+  "rating": null
  },
  "nav": {
   "curve": [
@@ -218,12 +260,18 @@
     "nav": 1000000.0,
     "position": 0.0,
     "rating": "Hold"
+   },
+   {
+    "date": "2026-09-01",
+    "nav": 1000000.0,
+    "position": 0.0,
+    "rating": null
    }
   ],
   "final_nav": 1000000.0,
   "total_return": 0.0,
   "capital": 1000000,
-  "missing_days": 18
+  "missing_days": 35
  },
  "report_params": {
   "position_weights": {
@@ -237,7 +285,7 @@
   "capital": 1000000,
   "hit_horizon_days": 5
  },
- "rating_stats_month": "2026-08",
+ "rating_stats_month": "2026-09",
  "rating_stats": {
   "per_rating": {
    "Buy": {
@@ -283,7 +331,7 @@
    "avg_alpha": null,
    "hit_rate": null
   },
-  "pending": 4,
+  "pending": 0,
   "no_close": 0,
   "horizon_days": 5
  },
