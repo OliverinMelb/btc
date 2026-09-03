@@ -1,6 +1,6 @@
 {
  "asset": "BTC",
- "generated_at_utc": "2026-09-02T01:55:24Z",
+ "generated_at_utc": "2026-09-03T01:57:15Z",
  "window_days": 90,
  "days": [
   {
@@ -191,11 +191,18 @@
    "regime": "chaos",
    "blank_sheet": true,
    "rating": null
+  },
+  {
+   "date": "2026-09-03",
+   "close": 77168.07,
+   "regime": "chaos",
+   "blank_sheet": true,
+   "rating": null
   }
  ],
  "latest": {
-  "date": "2026-09-02",
-  "close": 77446.95,
+  "date": "2026-09-03",
+  "close": 77168.07,
   "regime": "chaos",
   "blank_sheet": true,
   "rating": null
@@ -276,6 +283,12 @@
    },
    {
     "date": "2026-09-02",
+    "nav": 1000000.0,
+    "position": 0.0,
+    "rating": null
+   },
+   {
+    "date": "2026-09-03",
     "nav": 1000000.0,
     "position": 0.0,
     "rating": null
